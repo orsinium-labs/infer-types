@@ -23,10 +23,12 @@ class Ass(Enum):
     # cannot infer type of one or more of the return statements,
     # assume all return statements to have the same type
     ALL_RETURNS_SAME = 'all-returns-same'
-    # assume comparison operations aren't overloaded
+    # assume that comparison operations aren't overloaded
     NO_COMP_OVERLOAD = 'no-comp-overload'
-    # assume unary operators aren't overloaded
+    # assume that unary operators aren't overloaded
     NO_UNARY_OVERLOAD = 'no-unary-overload'
+    # assume that all CamelCase names are types
+    CAMEL_CASE_IS_TYPE = 'camel-case-is-type'
 
 
 @dataclass
@@ -117,9 +119,27 @@ class Inferno:
         if isinstance(node, ast.Call):
             if isinstance(node.func, ast.Attribute):
                 return self._get_attr_call_type(node.func)
+            if isinstance(node.func, ast.Name):
+                result = self._get_name_call_type(node.func)
+                if result is not None:
+                    return result
+                if self._is_camel(node.func.id):
+                    return Type(node.func.id, ass={Ass.CAMEL_CASE_IS_TYPE})
         return None
 
-    def _get_attr_call_type(self, node: ast.Attribute):
+    def _get_name_call_type(self, node: ast.Name):
+        module = typeshed_client.get_stub_names('builtins')
+        fun_def = module.get(node.id)
+        if fun_def is None:
+            return None
+        if not isinstance(fun_def.ast, ast.FunctionDef):
+            return None
+        ret_node = fun_def.ast.returns
+        if isinstance(ret_node, ast.Name):
+            return Type(ret_node.id)
+        return None
+
+    def _get_attr_call_type(self, node: ast.Attribute) -> Type | None:
         result = self.get_node_type(node.value)
         if result is None:
             return None
@@ -135,3 +155,14 @@ class Inferno:
         ret_node = method_def.ast.returns
         if isinstance(ret_node, ast.Name):
             return Type(ret_node.id)
+        return None
+
+    @staticmethod
+    def _is_camel(name: str) -> bool:
+        if not name:
+            return False
+        if not name[0].isupper():
+            return False
+        if not any(c.islower() for c in name):
+            return False
+        return True

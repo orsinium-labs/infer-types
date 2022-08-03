@@ -36,6 +36,9 @@ def get_stubs(tmp_path: Path, source: str) -> str:
 
     # methos of builtins
     ('"".join(x)', 'str'),
+
+    # builtin functions
+    ('len(x)', 'int'),
 ])
 def test_inferno_expr(tmp_path, expr, type):
     source = dedent(f"""
@@ -44,3 +47,24 @@ def test_inferno_expr(tmp_path, expr, type):
     """)
     result = get_stubs(tmp_path, source)
     assert result.strip() == f'def f() -> {type}: ...'
+
+
+@pytest.mark.parametrize('expr', [
+    'min(x)',
+    'x',
+    '+x',
+    'x + y',
+    'str.wat',
+    '"hi".wat',
+    'None.hi',
+    'None.hi()',
+    '"hi".wat()',
+    'wat.wat',
+])
+def test_cannot_infer_expr(tmp_path, expr):
+    source = dedent(f"""
+        def f():
+            return {expr}
+    """)
+    result = get_stubs(tmp_path, source)
+    assert result.strip() == ''
