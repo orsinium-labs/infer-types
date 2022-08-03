@@ -33,6 +33,9 @@ def get_stubs(tmp_path: Path, source: str) -> str:
     ('x < 10', 'bool'),
     ('~13', 'int'),
     ('+13', 'int'),
+
+    # methos of builtins
+    ('"".join(x)', 'str'),
 ])
 def test_inferno_expr(tmp_path, expr, type):
     source = dedent(f"""

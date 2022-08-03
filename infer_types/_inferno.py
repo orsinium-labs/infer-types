@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Iterator, Iterable
+import typeshed_client
 
 
 @dataclass
@@ -113,4 +114,24 @@ class Inferno:
                 return Type('bool')
             return Type('bool', ass={Ass.NO_COMP_OVERLOAD})
 
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Attribute):
+                return self._get_attr_call_type(node.func)
         return None
+
+    def _get_attr_call_type(self, node: ast.Attribute):
+        result = self.get_node_type(node.value)
+        if result is None:
+            return None
+        module = typeshed_client.get_stub_names('builtins')
+        cls_def = module.get(result.rep)
+        if cls_def is None:
+            return None
+        method_def = cls_def.child_nodes.get(node.attr)
+        if method_def is None:
+            return None
+        if not isinstance(method_def.ast, ast.FunctionDef):
+            return None
+        ret_node = method_def.ast.returns
+        if isinstance(ret_node, ast.Name):
+            return Type(ret_node.id)
