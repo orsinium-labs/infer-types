@@ -22,6 +22,10 @@ class Ass(Enum):
     # cannot infer type of one or more of the return statements,
     # assume all return statements to have the same type
     ALL_RETURNS_SAME = 'all-returns-same'
+    # assume comparison operations aren't overloaded
+    NO_COMP_OVERLOAD = 'no-comp-overload'
+    # assume unary operators aren't overloaded
+    NO_UNARY_OVERLOAD = 'no-unary-overload'
 
 
 @dataclass
@@ -89,11 +93,24 @@ class Inferno:
 
     def get_node_type(self, node: ast.expr) -> Type | None:
         if isinstance(node, ast.Constant):
+            if node.value is None:
+                return Type('None')
             return Type(type(node.value).__name__)
+
+        if isinstance(node, ast.JoinedStr):
+            return Type('str')
+
         if isinstance(node, ast.UnaryOp):
             if isinstance(node.op, ast.Not):
                 return Type('bool')
+            result = self.get_node_type(node.operand)
+            if result is not None:
+                result.ass.add(Ass.NO_UNARY_OVERLOAD)
+                return result
+
         if isinstance(node, ast.Compare) and len(node.ops) == 1:
-            if isinstance(node.ops[0], (ast.Is, ast.In)):
+            if isinstance(node.ops[0], ast.Is):
                 return Type('bool')
+            return Type('bool', ass={Ass.NO_COMP_OVERLOAD})
+
         return None
