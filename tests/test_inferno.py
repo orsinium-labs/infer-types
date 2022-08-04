@@ -107,3 +107,19 @@ def test_preserve_args(tmp_path, expr):
     """)
     result = get_stubs(tmp_path, source)
     assert result.strip() == f'def f({expr}) -> int: ...'
+
+
+def test_infer_class_methods(tmp_path):
+    given = dedent("""
+        class C:
+            def m(self, x):
+                return 13
+    """)
+    expected = dedent("""
+        class C:
+            def m(self, x) -> int: ...
+    """)
+    actual = get_stubs(tmp_path, given)
+    lactual = [line for line in actual.splitlines() if line]
+    lexpected = [line for line in expected.splitlines() if line]
+    assert lactual == lexpected

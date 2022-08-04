@@ -4,7 +4,7 @@ import astroid
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Iterator, Iterable
+from typing import Iterable, Iterator
 import typeshed_client
 
 
@@ -82,17 +82,29 @@ class Inferno:
     def generate_stub(self, path: Path) -> str:
         source = path.read_text()
         root = astroid.parse(source, path=str(path))
-        result = []
-        for fsig in self.infer_all(root):
-            result.append(fsig.stub)
+
+        result: list[str] = []
+        for node in root.body:
+            result.extend(self._get_stubs_for_node(node))
         return '\n\n'.join(result) + '\n'
 
-    def infer_all(self, root: astroid.Module) -> Iterator[FSig]:
-        for node in root.body:
-            if isinstance(node, astroid.FunctionDef):
-                sig = self.infer_sig(node)
-                if sig is not None:
-                    yield sig
+    def _get_stubs_for_node(self, node: astroid.NodeNG) -> Iterator[str]:
+        if isinstance(node, astroid.FunctionDef):
+            sig = self.infer_sig(node)
+            if sig is not None:
+                yield sig.stub
+            return
+
+        if isinstance(node, astroid.ClassDef):
+            printed_class = False
+            for subnode in node.body:
+                if isinstance(subnode, astroid.FunctionDef):
+                    sig = self.infer_sig(subnode)
+                    if sig is not None:
+                        if not printed_class:
+                            printed_class = True
+                            yield f'class {node.name}:'
+                        yield f'    {sig.stub}'
 
     def infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:
