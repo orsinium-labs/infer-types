@@ -55,6 +55,8 @@ class Ass(Enum):
     NO_UNARY_OVERLOAD = 'no-unary-overload'
     # assume that all CamelCase names are types
     CAMEL_CASE_IS_TYPE = 'camel-case-is-type'
+    # assume that built-in types and functions aren't shadowed
+    NO_SHADOWING = 'camel-case-is-type'
 
 
 @dataclass
@@ -150,6 +152,7 @@ class Inferno:
             if isinstance(node.func, astroid.Name):
                 result = self._get_ret_type_of_fun('builtins', node.func.name)
                 if result is not None:
+                    result.ass = {Ass.NO_SHADOWING}
                     return result
                 if is_camel(node.func.name):
                     return Type(node.func.name, ass={Ass.CAMEL_CASE_IS_TYPE})
@@ -188,11 +191,9 @@ class Inferno:
         if result is None:
             return None
         module = typeshed_client.get_stub_names('builtins')
-        cls_def = module.get(result.rep)
-        if cls_def is None:
-            return None
-        method_def = cls_def.child_nodes.get(node.attrname)
-        if method_def is None:
+        try:
+            method_def = module[result.rep].child_nodes[node.attrname]
+        except KeyError:
             return None
         if not isinstance(method_def.ast, ast.FunctionDef):
             return None
