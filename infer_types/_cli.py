@@ -12,7 +12,11 @@ def generate_stubs(in_dir: Path, out_dir: Path, stream: TextIO) -> None:
         if in_path.is_dir():
             generate_stubs(in_path, out_dir / in_path.name, stream)
             continue
+        if in_path.suffix != '.py':
+            continue
         stub_source = inferno.generate_stub(in_path)
+        if not stub_source.strip():
+            continue
         out_dir.mkdir(exist_ok=True, parents=True)
         out_path = out_dir / f'{in_path.stem}.pyi'
         out_path.write_text(stub_source)
