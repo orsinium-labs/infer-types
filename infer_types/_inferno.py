@@ -1,5 +1,6 @@
 from __future__ import annotations
 import ast
+import astroid
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -52,20 +53,20 @@ class Type:
 class Inferno:
     def generate_stub(self, path: Path) -> str:
         source = path.read_text()
-        root = ast.parse(source, mode='exec')
+        root = astroid.parse(source, path=str(path))
         result = []
         for fsig in self.infer_all(root):
             result.append(fsig.stub)
         return '\n\n'.join(result) + '\n'
 
-    def infer_all(self, root: ast.Module) -> Iterator[FSig]:
+    def infer_all(self, root: astroid.Module) -> Iterator[FSig]:
         for node in root.body:
-            if isinstance(node, ast.FunctionDef):
+            if isinstance(node, astroid.FunctionDef):
                 sig = self.infer_sig(node)
                 if sig is not None:
                     yield sig
 
-    def infer_sig(self, node: ast.FunctionDef) -> FSig | None:
+    def infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:
             return None
         return_type = self.get_return_type(node.body)
@@ -73,10 +74,10 @@ class Inferno:
             return None
         return FSig(node.name, return_type=return_type)
 
-    def get_return_type(self, nodes: Iterable[ast.AST]) -> Type:
+    def get_return_type(self, nodes: Iterable[astroid.NodeNG]) -> Type:
         result = Type('')
         for node in nodes:
-            if isinstance(node, ast.Return):
+            if isinstance(node, astroid.Return):
                 # bare return
                 if node.value is None:
                     result = result.merge(Type('None'))
@@ -87,49 +88,49 @@ class Inferno:
                 else:
                     result = result.merge(node_type)
                 continue
-            if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+            if isinstance(node, (astroid.FunctionDef, astroid.ClassDef)):
                 continue
-            branch_nodes = ast.iter_child_nodes(node)
+            branch_nodes = node.get_children()
             branch_type = self.get_return_type(branch_nodes)
             result = result.merge(branch_type)
         return result
 
-    def get_node_type(self, node: ast.expr) -> Type | None:
-        if isinstance(node, ast.Constant):
+    def get_node_type(self, node: astroid.NodeNG) -> Type | None:
+        if isinstance(node, astroid.Const):
             if node.value is None:
                 return Type('None')
             return Type(type(node.value).__name__)
 
-        if isinstance(node, ast.JoinedStr):
+        if isinstance(node, astroid.JoinedStr):
             return Type('str')
 
-        if isinstance(node, ast.UnaryOp):
-            if isinstance(node.op, ast.Not):
+        if isinstance(node, astroid.UnaryOp):
+            if node.op == 'not':
                 return Type('bool')
             result = self.get_node_type(node.operand)
             if result is not None:
                 result.ass.add(Ass.NO_UNARY_OVERLOAD)
                 return result
 
-        if isinstance(node, ast.Compare) and len(node.ops) == 1:
-            if isinstance(node.ops[0], ast.Is):
+        if isinstance(node, astroid.Compare) and len(node.ops) == 1:
+            if node.ops[0][0] == 'is':
                 return Type('bool')
             return Type('bool', ass={Ass.NO_COMP_OVERLOAD})
 
-        if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Attribute):
+        if isinstance(node, astroid.Call):
+            if isinstance(node.func, astroid.Attribute):
                 return self._get_attr_call_type(node.func)
-            if isinstance(node.func, ast.Name):
+            if isinstance(node.func, astroid.Name):
                 result = self._get_name_call_type(node.func)
                 if result is not None:
                     return result
-                if self._is_camel(node.func.id):
-                    return Type(node.func.id, ass={Ass.CAMEL_CASE_IS_TYPE})
+                if self._is_camel(node.func.name):
+                    return Type(node.func.name, ass={Ass.CAMEL_CASE_IS_TYPE})
         return None
 
-    def _get_name_call_type(self, node: ast.Name):
+    def _get_name_call_type(self, node: astroid.Name):
         module = typeshed_client.get_stub_names('builtins')
-        fun_def = module.get(node.id)
+        fun_def = module.get(node.name)
         if fun_def is None:
             return None
         if not isinstance(fun_def.ast, ast.FunctionDef):
@@ -139,15 +140,15 @@ class Inferno:
             return Type(ret_node.id)
         return None
 
-    def _get_attr_call_type(self, node: ast.Attribute) -> Type | None:
-        result = self.get_node_type(node.value)
+    def _get_attr_call_type(self, node: astroid.Attribute) -> Type | None:
+        result = self.get_node_type(node.expr)
         if result is None:
             return None
         module = typeshed_client.get_stub_names('builtins')
         cls_def = module.get(result.rep)
         if cls_def is None:
             return None
-        method_def = cls_def.child_nodes.get(node.attr)
+        method_def = cls_def.child_nodes.get(node.attrname)
         if method_def is None:
             return None
         if not isinstance(method_def.ast, ast.FunctionDef):
