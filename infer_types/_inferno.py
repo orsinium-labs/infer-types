@@ -36,11 +36,12 @@ def is_camel(name: str) -> bool:
 @dataclass
 class FSig:
     name: str
+    args: str
     return_type: Type
 
     @property
     def stub(self) -> str:
-        return f'def {self.name}() -> {self.return_type.rep}: ...'
+        return f'def {self.name}({self.args}) -> {self.return_type.rep}: ...'
 
 
 class Ass(Enum):
@@ -99,7 +100,11 @@ class Inferno:
         return_type = self.get_return_type(node.body)
         if not return_type.rep:
             return None
-        return FSig(node.name, return_type=return_type)
+        return FSig(
+            name=node.name,
+            args=node.args.as_string(),
+            return_type=return_type,
+        )
 
     def get_return_type(self, nodes: Iterable[astroid.NodeNG]) -> Type:
         result = Type('')

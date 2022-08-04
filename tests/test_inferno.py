@@ -85,3 +85,25 @@ def test_astroid_inference(tmp_path, setup, expr, type):
     """)
     result = get_stubs(tmp_path, source)
     assert result.strip() == f'def f() -> {type}: ...'
+
+
+@pytest.mark.parametrize('expr', [
+    '',
+    'x',
+    'x, y',
+    'x, *, y',
+    '*, a',
+    '*args',
+    '**kwargs',
+    '*args, **kwargs',
+    'x=None, y=12',
+    'x: int | None',
+    'x: int | None = 13',
+])
+def test_preserve_args(tmp_path, expr):
+    source = dedent(f"""
+        def f({expr}):
+            return 1
+    """)
+    result = get_stubs(tmp_path, source)
+    assert result.strip() == f'def f({expr}) -> int: ...'
