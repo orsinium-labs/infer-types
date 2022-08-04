@@ -39,6 +39,7 @@ def get_stubs(tmp_path: Path, source: str) -> str:
 
     # builtin functions
     ('len(x)', 'int'),
+    ('list(x)', 'list'),
 ])
 def test_inferno_expr(tmp_path, expr, type):
     source = dedent(f"""
@@ -68,3 +69,19 @@ def test_cannot_infer_expr(tmp_path, expr):
     """)
     result = get_stubs(tmp_path, source)
     assert result.strip() == ''
+
+
+@pytest.mark.parametrize('setup, expr, type', [
+    ('import math', 'math.sin(x)', 'float'),
+    ('from math import sin', 'sin(x)', 'float'),
+    ('my_list = list', 'my_list(x)', 'list'),
+])
+def test_astroid_inference(tmp_path, setup, expr, type):
+    source = dedent(f"""
+        {setup}
+
+        def f():
+            return {expr}
+    """)
+    result = get_stubs(tmp_path, source)
+    assert result.strip() == f'def f() -> {type}: ...'

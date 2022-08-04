@@ -8,6 +8,31 @@ from typing import Iterator, Iterable
 import typeshed_client
 
 
+def infer(node: astroid.NodeNG) -> list:
+    try:
+        return list(node.infer())
+    except astroid.InferenceError:
+        return []
+
+
+def qname_to_type(qname: str) -> Type:
+    if qname.startswith('builtins.'):
+        qname = qname.split('.')[-1]
+    if qname == 'NoneType':
+        qname = 'None'
+    return Type(qname)
+
+
+def is_camel(name: str) -> bool:
+    if not name:
+        return False
+    if not name[0].isupper():
+        return False
+    if not any(c.islower() for c in name):
+        return False
+    return True
+
+
 @dataclass
 class FSig:
     name: str
@@ -119,18 +144,36 @@ class Inferno:
 
         if isinstance(node, astroid.Call):
             if isinstance(node.func, astroid.Attribute):
-                return self._get_attr_call_type(node.func)
-            if isinstance(node.func, astroid.Name):
-                result = self._get_name_call_type(node.func)
+                result = self._get_attr_call_type(node.func)
                 if result is not None:
                     return result
-                if self._is_camel(node.func.name):
+            if isinstance(node.func, astroid.Name):
+                result = self._get_ret_type_of_fun('builtins', node.func.name)
+                if result is not None:
+                    return result
+                if is_camel(node.func.name):
                     return Type(node.func.name, ass={Ass.CAMEL_CASE_IS_TYPE})
+
+        for def_node in infer(node):
+            if not isinstance(def_node, astroid.Instance):
+                continue
+            return qname_to_type(def_node.pytype())
+        if isinstance(node, astroid.Call):
+            for def_node in infer(node.func):
+                if not isinstance(def_node, astroid.FunctionDef):
+                    continue
+                mod_name, _, fun_name = def_node.qname().rpartition('.')
+                return self._get_ret_type_of_fun(mod_name, fun_name)
+
         return None
 
-    def _get_name_call_type(self, node: astroid.Name):
-        module = typeshed_client.get_stub_names('builtins')
-        fun_def = module.get(node.name)
+    def _get_ret_type_of_fun(
+        self,
+        mod_name: str,
+        fun_name: str,
+    ) -> Type | None:
+        module = typeshed_client.get_stub_names(mod_name)
+        fun_def = module.get(fun_name)
         if fun_def is None:
             return None
         if not isinstance(fun_def.ast, ast.FunctionDef):
@@ -157,13 +200,3 @@ class Inferno:
         if isinstance(ret_node, ast.Name):
             return Type(ret_node.id)
         return None
-
-    @staticmethod
-    def _is_camel(name: str) -> bool:
-        if not name:
-            return False
-        if not name[0].isupper():
-            return False
-        if not any(c.islower() for c in name):
-            return False
-        return True
