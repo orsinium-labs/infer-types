@@ -25,6 +25,15 @@ def get_stubs(tmp_path: Path, source: str) -> str:
     ('', 'None'),
     ('True', 'bool'),
 
+    # collection literals
+    ('[]', 'list'),
+    ('[1]', 'list'),
+    ('()', 'tuple'),
+    ('(1,)', 'tuple'),
+    ('{}', 'dict'),
+    ('{1:2}', 'dict'),
+    ('{1,2}', 'set'),
+
     # operations with known type
     ('not x', 'bool'),
     ('x is str', 'bool'),

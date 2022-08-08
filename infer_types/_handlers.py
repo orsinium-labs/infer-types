@@ -48,6 +48,26 @@ def _handle_fstring(node: astroid.JoinedStr) -> Type | None:
     return Type('str')
 
 
+@handlers.register(astroid.List)
+def _handle_list(node: astroid.List) -> Type | None:
+    return Type('list')
+
+
+@handlers.register(astroid.Tuple)
+def _handle_tuple(node: astroid.Tuple) -> Type | None:
+    return Type('tuple')
+
+
+@handlers.register(astroid.Dict)
+def _handle_dict(node: astroid.Dict) -> Type | None:
+    return Type('dict')
+
+
+@handlers.register(astroid.Set)
+def _handle_set(node: astroid.Set) -> Type | None:
+    return Type('set')
+
+
 @handlers.register(astroid.UnaryOp)
 def _handle_unary_op(node: astroid.UnaryOp) -> Type | None:
     if node.op == 'not':
