@@ -1,11 +1,12 @@
 from __future__ import annotations
 import ast
 import astroid
-from dataclasses import dataclass, field
-from enum import Enum
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Iterator
 import typeshed_client
+
+from ._types import Type, FSig, Ass
 
 
 def infer(node: astroid.NodeNG) -> list:
@@ -42,57 +43,6 @@ def void(msg: str) -> None:
 
 
 @dataclass
-class FSig:
-    name: str
-    args: str
-    return_type: Type
-
-    @property
-    def imp(self) -> set[str]:
-        return self.return_type.imp
-
-    @property
-    def stub(self) -> str:
-        return f'def {self.name}({self.args}) -> {self.return_type.rep}: ...'
-
-
-class Ass(Enum):
-    """Assumptions about the types that might be not true but usually are true.
-    """
-    # cannot infer type of one or more of the return statements,
-    # assume all return statements to have the same type
-    ALL_RETURNS_SAME = 'all-returns-same'
-    # assume that comparison operations aren't overloaded
-    NO_COMP_OVERLOAD = 'no-comp-overload'
-    # assume that unary operators aren't overloaded
-    NO_UNARY_OVERLOAD = 'no-unary-overload'
-    # assume that all CamelCase names are types
-    CAMEL_CASE_IS_TYPE = 'camel-case-is-type'
-    # assume that built-in types and functions aren't shadowed
-    NO_SHADOWING = 'camel-case-is-type'
-
-
-@dataclass
-class Type:
-    rep: str
-    ass: set[Ass] = field(default_factory=set)
-    imp: set[str] = field(default_factory=set)
-
-    def merge(self, other: Type) -> Type:
-        if not self.rep or not other.rep:
-            rep = self.rep or other.rep
-        elif other.rep in self.rep:
-            rep = self.rep
-        else:
-            rep = f'{self.rep} | {other.rep}'
-        return Type(
-            rep=rep,
-            ass=self.ass | other.ass,
-            imp=self.imp | other.imp,
-        )
-
-
-@dataclass
 class Inferno:
     warn: Callable[[str], None] = void
 
@@ -106,6 +56,7 @@ class Inferno:
         return '\n\n'.join(result) + '\n'
 
     def _get_stubs_for_node(self, node: astroid.NodeNG) -> Iterator[str]:
+        # infer return type for function
         if isinstance(node, astroid.FunctionDef):
             sig = self.infer_sig(node)
             if sig is not None:
@@ -113,6 +64,7 @@ class Inferno:
                 yield sig.stub
             return
 
+        # infer return type for all methods of a class
         imports: set[str] = set()
         sigs: list[str] = []
         if isinstance(node, astroid.ClassDef):
@@ -131,7 +83,7 @@ class Inferno:
     def infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:
             return None
-        return_type = self.get_return_type(node.body)
+        return_type = self._get_return_type(node.body)
         if not return_type.rep:
             return None
         return FSig(
@@ -140,7 +92,11 @@ class Inferno:
             return_type=return_type,
         )
 
-    def get_return_type(self, nodes: Iterable[astroid.NodeNG]) -> Type:
+    def _get_return_type(self, nodes: Iterable[astroid.NodeNG]) -> Type:
+        """
+        Recursively walk the given body, find all return stmts,
+        and infer their type. The result is a union of these types.
+        """
         result = Type('')
         for node in nodes:
             if isinstance(node, astroid.Return):
@@ -157,7 +113,7 @@ class Inferno:
             if isinstance(node, (astroid.FunctionDef, astroid.ClassDef)):
                 continue
             branch_nodes = node.get_children()
-            branch_type = self.get_return_type(branch_nodes)
+            branch_type = self._get_return_type(branch_nodes)
             result = result.merge(branch_type)
         return result
 
