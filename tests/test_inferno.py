@@ -6,7 +6,7 @@ from infer_types._inferno import Inferno
 
 
 def get_stubs(tmp_path: Path, source: str) -> str:
-    inferno = Inferno()
+    inferno = Inferno(warn=print)
     path = tmp_path / 'example.py'
     path.write_text(source)
     result = inferno.generate_stub(path).strip()
@@ -134,6 +134,10 @@ def test_infer_class_methods(tmp_path):
     (
         'from datetime import date', 'date(1,2,3)',
         'from datetime import date', 'date',
+    ),
+    (
+        'import ast', 'ast.walk(x)',
+        'from typing import Iterator', 'Iterator',
     ),
 ])
 def test_import_types(tmp_path, g_imp, g_expr, e_imp, e_type):

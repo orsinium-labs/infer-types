@@ -4,7 +4,7 @@ import astroid
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import Callable, Iterable, Iterator
 import typeshed_client
 
 
@@ -35,6 +35,10 @@ def is_camel(name: str) -> bool:
     if not any(c.islower() for c in name):
         return False
     return True
+
+
+def void(msg: str) -> None:
+    return None
 
 
 @dataclass
@@ -88,7 +92,10 @@ class Type:
         )
 
 
+@dataclass
 class Inferno:
+    warn: Callable[[str], None] = void
+
     def generate_stub(self, path: Path) -> str:
         source = path.read_text()
         root = astroid.parse(source, path=str(path))
@@ -217,28 +224,60 @@ class Inferno:
         """For the given module and function name, get return type of the function.
         """
         module = typeshed_client.get_stub_names(mod_name)
+        if module is None:
+            self.warn(f'no typeshed stubs for module {mod_name}')
+            return None
         fun_def = module.get(fun_name)
         if fun_def is None:
+            self.warn('no typeshed stubs for module')
             return None
         if not isinstance(fun_def.ast, ast.FunctionDef):
+            self.warn('resolved call target is not a function')
             return None
         ret_node = fun_def.ast.returns
-        if isinstance(ret_node, ast.Name):
-            return Type(ret_node.id)
-        return None
+        return self._conv_node_to_type(mod_name, ret_node)
 
     def _get_attr_call_type(self, node: astroid.Attribute) -> Type | None:
         result = self._get_node_type(node.expr)
         if result is None:
+            self.warn('cannot get type of the left side of attribute')
             return None
         module = typeshed_client.get_stub_names('builtins')
+        assert module is not None
         try:
             method_def = module[result.rep].child_nodes[node.attrname]
         except KeyError:
+            self.warn('not a built-in function')
             return None
         if not isinstance(method_def.ast, ast.FunctionDef):
+            self.warn('resolved call target of attr is not a function')
             return None
         ret_node = method_def.ast.returns
-        if isinstance(ret_node, ast.Name):
-            return Type(ret_node.id)
+        return self._conv_node_to_type('builtins', ret_node)
+
+    def _conv_node_to_type(
+        self, mod_name: str, node: ast.AST | None,
+    ) -> Type | None:
+        import builtins
+        import typing
+
+        if node is None:
+            self.warn('no return type annotation for called function def')
+            return None
+
+        # fore generics, keep it generic
+        if isinstance(node, ast.Subscript):
+            return self._conv_node_to_type(mod_name, node.value)
+
+        # for regular name, check if it is a typing primitive or a built-in
+        if isinstance(node, ast.Name):
+            name = node.id
+            if hasattr(builtins, name):
+                return Type(name, ass={Ass.NO_SHADOWING})
+            if name in typing.__all__:
+                return Type(name, imp={f'from typing import {name}'})
+            self.warn(f'cannot resolve {name} into a known type')
+            return None
+
+        self.warn('cannot resolve return AST node into a known type')
         return None
