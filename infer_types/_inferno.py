@@ -143,7 +143,7 @@ class Inferno:
         if isinstance(node, astroid.JoinedStr):
             return Type('str')
 
-        # inary operation
+        # unary operation
         if isinstance(node, astroid.UnaryOp):
             if node.op == 'not':
                 return Type('bool')
@@ -165,9 +165,14 @@ class Inferno:
                 if result is not None:
                     return result
             if isinstance(node.func, astroid.Name):
-                result = self._get_ret_type_of_fun('builtins', node.func.name)
+                _, symbol_defs = node.func.lookup(node.func.name)
+                mod_name = 'builtins'
+                if symbol_defs:
+                    symbol_def = symbol_defs[0]
+                    if isinstance(symbol_def, astroid.ImportFrom):
+                        mod_name = symbol_def.modname
+                result = self._get_ret_type_of_fun(mod_name, node.func.name)
                 if result is not None:
-                    result.ass = {Ass.NO_SHADOWING}
                     return result
                 if is_camel(node.func.name):
                     return Type(node.func.name, ass={Ass.CAMEL_CASE_IS_TYPE})
