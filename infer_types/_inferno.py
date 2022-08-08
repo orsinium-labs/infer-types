@@ -9,6 +9,14 @@ import typeshed_client
 from ._types import Type, FSig, Ass
 
 
+SUPPORTED_DECORATORS = frozenset({
+    'staticmethod',
+    'classmethod',
+    'property',
+    'cached_property',
+})
+
+
 def infer(node: astroid.NodeNG) -> list:
     try:
         return list(node.infer())
@@ -53,7 +61,7 @@ class Inferno:
         result: list[str] = []
         for node in root.body:
             result.extend(self._get_stubs_for_node(node))
-        return '\n\n'.join(result) + '\n'
+        return '\n'.join(result) + '\n'
 
     def _get_stubs_for_node(self, node: astroid.NodeNG) -> Iterator[str]:
         # infer return type for function
@@ -69,16 +77,23 @@ class Inferno:
         sigs: list[str] = []
         if isinstance(node, astroid.ClassDef):
             for subnode in node.body:
-                if isinstance(subnode, astroid.FunctionDef):
-                    sig = self.infer_sig(subnode)
-                    if sig is None:
-                        continue
-                    imports.update(sig.imp)
-                    sigs.append(f'    {sig.stub}')
+                if not isinstance(subnode, astroid.FunctionDef):
+                    continue
+                sig = self.infer_sig(subnode)
+                if sig is None:
+                    continue
+                dec_qname: str
+                for dec_qname in subnode.decoratornames():
+                    mod_name, _, dec_name = dec_qname.rpartition('.')
+                    if mod_name:
+                        imports.add(f'from {mod_name} import {dec_name}')
+                        sigs.append(f'    @{dec_name}')
+                imports.update(sig.imp)
+                sigs.append(f'    {sig.stub}')
+        yield from imports
         if sigs:
             yield f'class {node.name}:'
             yield from sigs
-        yield from imports
 
     def infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:
