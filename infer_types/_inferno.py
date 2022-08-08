@@ -20,7 +20,11 @@ def qname_to_type(qname: str) -> Type:
         qname = qname.split('.')[-1]
     if qname == 'NoneType':
         qname = 'None'
-    return Type(qname)
+    if '.' not in qname:
+        return Type(qname)
+    mod_name, _, obj_name = qname.rpartition('.')
+    imp = f'from {mod_name} import {obj_name}'
+    return Type(obj_name, imp={imp})
 
 
 def is_camel(name: str) -> bool:
@@ -38,6 +42,10 @@ class FSig:
     name: str
     args: str
     return_type: Type
+
+    @property
+    def imp(self) -> set[str]:
+        return self.return_type.imp
 
     @property
     def stub(self) -> str:
@@ -64,6 +72,7 @@ class Ass(Enum):
 class Type:
     rep: str
     ass: set[Ass] = field(default_factory=set)
+    imp: set[str] = field(default_factory=set)
 
     def merge(self, other: Type) -> Type:
         if not self.rep or not other.rep:
@@ -75,6 +84,7 @@ class Type:
         return Type(
             rep=rep,
             ass=self.ass | other.ass,
+            imp=self.imp | other.imp,
         )
 
 
@@ -92,19 +102,24 @@ class Inferno:
         if isinstance(node, astroid.FunctionDef):
             sig = self.infer_sig(node)
             if sig is not None:
+                yield from sig.imp
                 yield sig.stub
             return
 
+        imports: set[str] = set()
+        sigs: list[str] = []
         if isinstance(node, astroid.ClassDef):
-            printed_class = False
             for subnode in node.body:
                 if isinstance(subnode, astroid.FunctionDef):
                     sig = self.infer_sig(subnode)
-                    if sig is not None:
-                        if not printed_class:
-                            printed_class = True
-                            yield f'class {node.name}:'
-                        yield f'    {sig.stub}'
+                    if sig is None:
+                        continue
+                    imports.update(sig.imp)
+                    sigs.append(f'    {sig.stub}')
+        if sigs:
+            yield f'class {node.name}:'
+            yield from sigs
+        yield from imports
 
     def infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:
@@ -126,7 +141,7 @@ class Inferno:
                 if node.value is None:
                     result = result.merge(Type('None'))
                     continue
-                node_type = self.get_node_type(node.value)
+                node_type = self._get_node_type(node.value)
                 if node_type is None:
                     result.ass.add(Ass.ALL_RETURNS_SAME)
                 else:
@@ -139,28 +154,33 @@ class Inferno:
             result = result.merge(branch_type)
         return result
 
-    def get_node_type(self, node: astroid.NodeNG) -> Type | None:
+    def _get_node_type(self, node: astroid.NodeNG) -> Type | None:
+        """Try to detect type of the given AST node.
+        """
+        # explicit literals
         if isinstance(node, astroid.Const):
             if node.value is None:
                 return Type('None')
             return Type(type(node.value).__name__)
-
         if isinstance(node, astroid.JoinedStr):
             return Type('str')
 
+        # inary operation
         if isinstance(node, astroid.UnaryOp):
             if node.op == 'not':
                 return Type('bool')
-            result = self.get_node_type(node.operand)
+            result = self._get_node_type(node.operand)
             if result is not None:
                 result.ass.add(Ass.NO_UNARY_OVERLOAD)
                 return result
 
+        # binary operation
         if isinstance(node, astroid.Compare) and len(node.ops) == 1:
             if node.ops[0][0] == 'is':
                 return Type('bool')
             return Type('bool', ass={Ass.NO_COMP_OVERLOAD})
 
+        # call of a function or method
         if isinstance(node, astroid.Call):
             if isinstance(node.func, astroid.Attribute):
                 result = self._get_attr_call_type(node.func)
@@ -174,10 +194,12 @@ class Inferno:
                 if is_camel(node.func.name):
                     return Type(node.func.name, ass={Ass.CAMEL_CASE_IS_TYPE})
 
+        # astroid inference for class instantination
         for def_node in infer(node):
             if not isinstance(def_node, astroid.Instance):
                 continue
             return qname_to_type(def_node.pytype())
+        # astroid inference for a function call
         if isinstance(node, astroid.Call):
             for def_node in infer(node.func):
                 if not isinstance(def_node, astroid.FunctionDef):
@@ -192,6 +214,8 @@ class Inferno:
         mod_name: str,
         fun_name: str,
     ) -> Type | None:
+        """For the given module and function name, get return type of the function.
+        """
         module = typeshed_client.get_stub_names(mod_name)
         fun_def = module.get(fun_name)
         if fun_def is None:
@@ -204,7 +228,7 @@ class Inferno:
         return None
 
     def _get_attr_call_type(self, node: astroid.Attribute) -> Type | None:
-        result = self.get_node_type(node.expr)
+        result = self._get_node_type(node.expr)
         if result is None:
             return None
         module = typeshed_client.get_stub_names('builtins')

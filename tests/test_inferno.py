@@ -9,7 +9,8 @@ def get_stubs(tmp_path: Path, source: str) -> str:
     inferno = Inferno()
     path = tmp_path / 'example.py'
     path.write_text(source)
-    return inferno.generate_stub(path)
+    result = inferno.generate_stub(path).strip()
+    return '\n'.join(line for line in result.splitlines() if line)
 
 
 @pytest.mark.parametrize('expr, type', [
@@ -47,7 +48,7 @@ def test_inferno_expr(tmp_path, expr, type):
             return {expr}
     """)
     result = get_stubs(tmp_path, source)
-    assert result.strip() == f'def f() -> {type}: ...'
+    assert result == f'def f() -> {type}: ...'
 
 
 @pytest.mark.parametrize('expr', [
@@ -68,7 +69,7 @@ def test_cannot_infer_expr(tmp_path, expr):
             return {expr}
     """)
     result = get_stubs(tmp_path, source)
-    assert result.strip() == ''
+    assert result == ''
 
 
 @pytest.mark.parametrize('setup, expr, type', [
@@ -84,7 +85,7 @@ def test_astroid_inference(tmp_path, setup, expr, type):
             return {expr}
     """)
     result = get_stubs(tmp_path, source)
-    assert result.strip() == f'def f() -> {type}: ...'
+    assert result == f'def f() -> {type}: ...'
 
 
 @pytest.mark.parametrize('expr', [
@@ -106,7 +107,7 @@ def test_preserve_args(tmp_path, expr):
             return 1
     """)
     result = get_stubs(tmp_path, source)
-    assert result.strip() == f'def f({expr}) -> int: ...'
+    assert result == f'def f({expr}) -> int: ...'
 
 
 def test_infer_class_methods(tmp_path):
@@ -123,3 +124,24 @@ def test_infer_class_methods(tmp_path):
     lactual = [line for line in actual.splitlines() if line]
     lexpected = [line for line in expected.splitlines() if line]
     assert lactual == lexpected
+
+
+@pytest.mark.parametrize('g_imp, g_expr, e_imp, e_type', [
+    (
+        'import datetime', 'datetime.date(1,2,3)',
+        'from datetime import date', 'date',
+    ),
+    (
+        'from datetime import date', 'date(1,2,3)',
+        'from datetime import date', 'date',
+    ),
+])
+def test_import_types(tmp_path, g_imp, g_expr, e_imp, e_type):
+    source = dedent(f"""
+        {g_imp}
+
+        def f():
+            return {g_expr}
+    """)
+    result = get_stubs(tmp_path, source)
+    assert result == f'{e_imp}\ndef f() -> {e_type}: ...'
