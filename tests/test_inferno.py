@@ -34,6 +34,24 @@ def get_stubs(tmp_path: Path, source: str) -> str:
     ('{1:2}', 'dict'),
     ('{1,2}', 'set'),
 
+    # collection constructors
+    ('list()', 'list'),
+    ('list(x)', 'list'),
+    ('dict()', 'dict'),
+    ('dict(x)', 'dict'),
+    ('set()', 'set'),
+    ('set(x)', 'set'),
+    ('tuple()', 'tuple'),
+    ('tuple(x)', 'tuple'),
+
+    # other type constructors
+    ('int()', 'int'),
+    ('int(x)', 'int'),
+    ('str()', 'str'),
+    ('str(x)', 'str'),
+    ('float()', 'float'),
+    ('float(x)', 'float'),
+
     # operations with known type
     ('not x', 'bool'),
     ('x is str', 'bool'),
@@ -49,7 +67,6 @@ def get_stubs(tmp_path: Path, source: str) -> str:
 
     # builtin functions
     ('len(x)', 'int'),
-    ('list(x)', 'list'),
 ])
 def test_inferno_expr(tmp_path, expr, type):
     source = dedent(f"""
