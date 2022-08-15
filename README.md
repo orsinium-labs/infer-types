@@ -28,4 +28,6 @@ The next thing you need to do is to apply the stub files back to the code. For t
 retype -it ./example/ ./example/
 ```
 
+The infer-types tool uses the new fancy syntax for type annotations introduced in Python 3.10. So, instead of `Optional[str]` it will emit `str | None`. If your code is supposed to run on an older version of Python, add `from __future__ import annotations` at the beginning of each file. It will solve the issue and also make startup of your app faster.
+
 See [awesome-python-typing](https://github.com/typeddjango/awesome-python-typing) for more tools to help you with annotating your code.
