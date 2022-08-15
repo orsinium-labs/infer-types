@@ -1,10 +1,12 @@
 from __future__ import annotations
+
+import sys
 from argparse import ArgumentParser
 from pathlib import Path
-import sys
 from typing import NoReturn, TextIO
-from ._inferno import Inferno
+
 from ._format import format_code
+from ._inferno import Inferno
 
 
 def generate_stubs(in_dir: Path, out_dir: Path, stream: TextIO) -> None:

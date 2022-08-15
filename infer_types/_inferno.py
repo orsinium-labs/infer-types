@@ -1,11 +1,13 @@
 from __future__ import annotations
-import astroid
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Iterator
 
+import astroid
+
 from ._handlers import handlers
-from ._types import Type, FSig, Ass
+from ._types import Ass, FSig, Type
 
 
 SUPPORTED_DECORATORS = frozenset({

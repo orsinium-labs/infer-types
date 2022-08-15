@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 import astroid
+
 from ._types import Type
 
 

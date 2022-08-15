@@ -1,12 +1,15 @@
 from __future__ import annotations
+
 import ast
 from dataclasses import dataclass, field
-from typing import Callable, TypeVar
-import astroid
-from ._types import Type, Ass
-from ._helpers import infer, qname_to_type, is_camel
-import typeshed_client
 from logging import getLogger
+from typing import Callable, TypeVar
+
+import astroid
+import typeshed_client
+
+from ._helpers import infer, is_camel, qname_to_type
+from ._types import Ass, Type
 
 
 logger = getLogger(__package__)
