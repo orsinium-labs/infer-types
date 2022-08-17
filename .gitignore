@@ -2,3 +2,4 @@ __pycache__/
 /.*_cache/
 /playground/
 /types/
+/.coverage*

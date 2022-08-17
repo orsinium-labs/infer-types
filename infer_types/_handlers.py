@@ -89,6 +89,26 @@ def _handle_compare(node: astroid.Compare) -> Type | None:
     return Type('bool', ass={Ass.NO_COMP_OVERLOAD})
 
 
+@handlers.register(astroid.ListComp)
+def _handle_list_comp(node: astroid.ListComp) -> Type | None:
+    return Type('list')
+
+
+@handlers.register(astroid.SetComp)
+def _handle_set_comp(node: astroid.SetComp) -> Type | None:
+    return Type('set')
+
+
+@handlers.register(astroid.DictComp)
+def _handle_dict_comp(node: astroid.DictComp) -> Type | None:
+    return Type('dict')
+
+
+@handlers.register(astroid.GeneratorExp)
+def _handle_gen_expr(node: astroid.GeneratorExp) -> Type | None:
+    return Type('Iterator', imp={'from typing import Iterator'})
+
+
 @handlers.register(astroid.Call)
 def _handle_call(node: astroid.Call) -> Type | None:
     if isinstance(node.func, astroid.Attribute):

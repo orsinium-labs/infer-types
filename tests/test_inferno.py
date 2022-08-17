@@ -67,6 +67,11 @@ def get_stubs(tmp_path: Path, source: str) -> str:
 
     # builtin functions
     ('len(x)', 'int'),
+
+    # comprehensions
+    ('[x for x in y]', 'list'),
+    ('{x for x in y}', 'set'),
+    ('{x: y for x in z}', 'dict'),
 ])
 def test_inferno_expr(tmp_path, expr, type):
     source = dedent(f"""
