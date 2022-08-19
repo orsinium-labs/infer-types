@@ -13,110 +13,22 @@ def get_stubs(tmp_path: Path, source: str) -> str:
     return '\n'.join(line for line in result.splitlines() if line)
 
 
-@pytest.mark.parametrize('expr, type', [
-    # literals
-    ('1', 'int'),
-    ('1.2', 'float'),
-    ('"hi"', 'str'),
-    ('f"hi"', 'str'),
-    ('b"hi"', 'bytes'),
-    ('""', 'str'),
-    ('None', 'None'),
-    ('', 'None'),
-    ('True', 'bool'),
-
-    # collection literals
-    ('[]', 'list'),
-    ('[1]', 'list'),
-    ('()', 'tuple'),
-    ('(1,)', 'tuple'),
-    ('{}', 'dict'),
-    ('{1:2}', 'dict'),
-    ('{1,2}', 'set'),
-
-    # collection constructors
-    ('list()', 'list'),
-    ('list(x)', 'list'),
-    ('dict()', 'dict'),
-    ('dict(x)', 'dict'),
-    ('set()', 'set'),
-    ('set(x)', 'set'),
-    ('tuple()', 'tuple'),
-    ('tuple(x)', 'tuple'),
-
-    # other type constructors
-    ('int()', 'int'),
-    ('int(x)', 'int'),
-    ('str()', 'str'),
-    ('str(x)', 'str'),
-    ('float()', 'float'),
-    ('float(x)', 'float'),
-
-    # operations with known type
-    ('not x', 'bool'),
-    ('x is str', 'bool'),
-
-    # operations with assumptions
-    ('x in (1, 2, 3)', 'bool'),
-    ('x < 10', 'bool'),
-    ('~13', 'int'),
-    ('+13', 'int'),
-
-    # methos of builtins
-    ('"".join(x)', 'str'),
-
-    # builtin functions
-    ('len(x)', 'int'),
-
-    # comprehensions
-    ('[x for x in y]', 'list'),
-    ('{x for x in y}', 'set'),
-    ('{x: y for x in z}', 'dict'),
-])
-def test_inferno_expr(tmp_path, expr, type):
-    source = dedent(f"""
-        def f():
-            return {expr}
+def test_inferno_expr(tmp_path):
+    source = dedent("""
+        def f(x):
+            return len(x)
     """)
     result = get_stubs(tmp_path, source)
-    assert result == f'def f() -> {type}: ...'
+    assert result == 'def f(x) -> int: ...'
 
 
-@pytest.mark.parametrize('expr', [
-    'min(x)',
-    'x',
-    '+x',
-    'x + y',
-    'str.wat',
-    '"hi".wat',
-    'None.hi',
-    'None.hi()',
-    '"hi".wat()',
-    'wat.wat',
-])
-def test_cannot_infer_expr(tmp_path, expr):
-    source = dedent(f"""
-        def f():
-            return {expr}
+def test_cannot_infer_expr(tmp_path):
+    source = dedent("""
+        def f(x):
+            return min(x)
     """)
     result = get_stubs(tmp_path, source)
     assert result == ''
-
-
-@pytest.mark.parametrize('setup, expr, type', [
-    ('import math', 'math.sin(x)', 'float'),
-    ('from math import sin', 'sin(x)', 'float'),
-    ('my_list = list', 'my_list(x)', 'list'),
-])
-def test_astroid_inference(tmp_path, setup, expr, type):
-    source = dedent(f"""
-        {setup}
-
-        def f():
-            return {expr}
-    """)
-    result = get_stubs(tmp_path, source)
-    assert result == f'def f() -> {type}: ...'
 
 
 @pytest.mark.parametrize('expr', [

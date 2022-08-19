@@ -5,9 +5,8 @@ from pathlib import Path
 from typing import Callable, Iterable, Iterator
 
 import astroid
-
-from ._handlers import handlers
-from ._types import Ass, FSig, Type
+from astypes import Type, get_type, Ass
+from ._types import FSig
 
 
 SUPPORTED_DECORATORS = frozenset({
@@ -40,7 +39,7 @@ class Inferno:
         if isinstance(node, astroid.FunctionDef):
             sig = self.infer_sig(node)
             if sig is not None:
-                yield from sig.imp
+                yield from sig.imports
                 yield sig.stub
             return
 
@@ -60,7 +59,7 @@ class Inferno:
                     if mod_name:
                         imports.add(f'from {mod_name} import {dec_name}')
                         sigs.append(f'    @{dec_name}')
-                imports.update(sig.imp)
+                imports.update(sig.imports)
                 sigs.append(f'    {sig.stub}')
         yield from imports
         if sigs:
@@ -71,7 +70,7 @@ class Inferno:
         if node.returns is not None:
             return None
         return_type = self._get_return_type(node.body)
-        if not return_type.rep:
+        if return_type.unknown:
             return None
         return FSig(
             name=node.name,
@@ -84,16 +83,16 @@ class Inferno:
         Recursively walk the given body, find all return stmts,
         and infer their type. The result is a union of these types.
         """
-        result = Type('')
+        result = Type.new('')
         for node in nodes:
             if isinstance(node, astroid.Return):
                 # bare return
                 if node.value is None:
-                    result = result.merge(Type('None'))
+                    result = result.merge(Type.new('None'))
                     continue
-                node_type = handlers.node_to_type(node.value)
+                node_type = get_type(node.value)
                 if node_type is None:
-                    result.ass.add(Ass.ALL_RETURNS_SAME)
+                    result = result.add_ass(Ass.ALL_RETURNS_SAME)
                 else:
                     result = result.merge(node_type)
                 continue

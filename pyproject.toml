@@ -5,7 +5,7 @@ build-backend = "flit_core.buildapi"
 [project]
 name = "infer_types"
 authors = [
-    {name = "Gram", email = "gram@orsinium.dev"},
+    {name = "Gram", email = "git@orsinium.dev"},
 ]
 license = {file = "LICENSE"}
 readme = "README.md"
@@ -25,7 +25,7 @@ keywords = [
     "formatter",
     "code formatter",
 ]
-dependencies = ["astroid", "typeshed_client"]
+dependencies = ["astroid", "astypes"]
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov"]
