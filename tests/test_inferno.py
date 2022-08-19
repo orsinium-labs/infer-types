@@ -22,10 +22,41 @@ def test_inferno_expr(tmp_path):
     assert result == 'def f(x) -> int: ...'
 
 
+def test_infer_bare_return(tmp_path):
+    source = dedent("""
+        def f(x):
+            if x == y:
+                return
+            return 13
+    """)
+    result = get_stubs(tmp_path, source)
+    assert result == 'def f(x) -> int | None: ...'
+
+
+def test_skip_subfuncs(tmp_path):
+    source = dedent("""
+        def f(x):
+            def f2():
+                return 'hello'
+            return 13
+    """)
+    result = get_stubs(tmp_path, source)
+    assert result == 'def f(x) -> int: ...'
+
+
 def test_cannot_infer_expr(tmp_path):
     source = dedent("""
         def f(x):
             return min(x)
+    """)
+    result = get_stubs(tmp_path, source)
+    assert result == ''
+
+
+def test_skip_annotated(tmp_path):
+    source = dedent("""
+        def f() -> int:
+            return "hi"
     """)
     result = get_stubs(tmp_path, source)
     assert result == ''
@@ -55,7 +86,9 @@ def test_preserve_args(tmp_path, expr):
 
 def test_infer_class_methods(tmp_path):
     given = dedent("""
+        SOMETHING = 13
         class C:
+            some_attr: str = 14
             def m(self, x):
                 return 13
     """)
@@ -63,6 +96,69 @@ def test_infer_class_methods(tmp_path):
         class C:
             def m(self, x) -> int: ...
     """)
+    actual = get_stubs(tmp_path, given)
+    lactual = [line for line in actual.splitlines() if line]
+    lexpected = [line for line in expected.splitlines() if line]
+    assert lactual == lexpected
+
+
+def test_preserve_property_decorator(tmp_path):
+    given = dedent("""
+        class C:
+            @property
+            @garbage
+            def m(self, x):
+                return 13
+    """)
+    expected = dedent("""
+        class C:
+            @property
+            def m(self, x) -> int: ...
+    """)
+    actual = get_stubs(tmp_path, given)
+    lactual = [line for line in actual.splitlines() if line]
+    lexpected = [line for line in expected.splitlines() if line]
+    assert lactual == lexpected
+
+
+def test_preserve_cached_property_decorator(tmp_path):
+    given = dedent("""
+        from functools import cached_property
+        class C:
+            @cached_property
+            def m(self, x):
+                return 13
+    """)
+    expected = dedent("""
+        from functools import cached_property
+        class C:
+            @cached_property
+            def m(self, x) -> int: ...
+    """)
+    actual = get_stubs(tmp_path, given)
+    lactual = [line for line in actual.splitlines() if line]
+    lexpected = [line for line in expected.splitlines() if line]
+    assert lactual == lexpected
+
+
+def test_cannot_infer_class_methods(tmp_path):
+    given = dedent("""
+        class C:
+            def m(self, x):
+                return x
+    """)
+    assert get_stubs(tmp_path, given) == ""
+
+
+def test_can_infer_only_one(tmp_path):
+    given = dedent("""
+        def f(x):
+            if x == y:
+                return x
+            else:
+                return 13
+    """)
+    expected = dedent("def f(x) -> int: ...")
     actual = get_stubs(tmp_path, given)
     lactual = [line for line in actual.splitlines() if line]
     lexpected = [line for line in expected.splitlines() if line]

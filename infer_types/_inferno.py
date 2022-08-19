@@ -9,14 +9,6 @@ from astypes import Type, get_type, Ass
 from ._types import FSig
 
 
-SUPPORTED_DECORATORS = frozenset({
-    'staticmethod',
-    'classmethod',
-    'property',
-    'cached_property',
-})
-
-
 def void(msg: str) -> None:
     return None
 
@@ -56,8 +48,9 @@ class Inferno:
                 dec_qname: str
                 for dec_qname in subnode.decoratornames():
                     mod_name, _, dec_name = dec_qname.rpartition('.')
-                    if mod_name:
+                    if mod_name != 'builtins':
                         imports.add(f'from {mod_name} import {dec_name}')
+                    if mod_name:
                         sigs.append(f'    @{dec_name}')
                 imports.update(sig.imports)
                 sigs.append(f'    {sig.stub}')
