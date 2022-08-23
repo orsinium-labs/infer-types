@@ -6,7 +6,7 @@ from infer_types._inferno import Inferno
 
 
 def get_stubs(tmp_path: Path, source: str) -> str:
-    inferno = Inferno(warn=print)
+    inferno = Inferno()
     path = tmp_path / 'example.py'
     path.write_text(source)
     result = inferno.generate_stub(path).strip()

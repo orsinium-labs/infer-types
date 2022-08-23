@@ -1,22 +1,17 @@
 from __future__ import annotations
+from collections import deque
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Iterator
+from typing import Iterable, Iterator
 
 import astroid
 from astypes import Type, get_type, Ass
-from ._types import FSig
-
-
-def void(msg: str) -> None:
-    return None
+from ._fsig import FSig
 
 
 @dataclass
 class Inferno:
-    warn: Callable[[str], None] = void
-
     def generate_stub(self, path: Path) -> str:
         source = path.read_text()
         root = astroid.parse(source, path=str(path))
@@ -77,21 +72,29 @@ class Inferno:
         and infer their type. The result is a union of these types.
         """
         result = Type.new('')
-        for node in nodes:
-            if isinstance(node, astroid.Return):
-                # bare return
-                if node.value is None:
-                    result = result.merge(Type.new('None'))
-                    continue
-                node_type = get_type(node.value)
-                if node_type is None:
-                    result = result.add_ass(Ass.ALL_RETURNS_SAME)
-                else:
-                    result = result.merge(node_type)
+        for node in self._walk(nodes):
+            if not isinstance(node, astroid.Return):
                 continue
+            # bare return
+            if node.value is None:
+                result = result.merge(Type.new('None'))
+                continue
+            node_type = get_type(node.value)
+            if node_type is None:
+                result = result.add_ass(Ass.ALL_RETURNS_SAME)
+            else:
+                result = result.merge(node_type)
+        return result
+
+    @staticmethod
+    def _walk(nodes: Iterable[astroid.NodeNG]) -> Iterator[astroid.NodeNG]:
+        stack = deque(nodes)
+        while stack:
+            node = stack.pop()
             if isinstance(node, (astroid.FunctionDef, astroid.ClassDef)):
                 continue
-            branch_nodes = node.get_children()
-            branch_type = self._get_return_type(branch_nodes)
-            result = result.merge(branch_type)
-        return result
+            doc_node = getattr(node, 'doc_node', None)
+            if doc_node is not None and doc_node is not node:
+                stack.append(doc_node)
+            stack.extend(node.get_children())
+            yield node
