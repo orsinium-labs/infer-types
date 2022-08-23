@@ -1,13 +1,13 @@
 from __future__ import annotations
-from collections import deque
 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator
 
 import astroid
-from astypes import Type, get_type, Ass
+from astypes import Type
 from ._fsig import FSig
+from ._extractors import extractors
 
 
 @dataclass
@@ -58,7 +58,7 @@ class Inferno:
         if node.returns is not None:
             return None
         return_type = self._get_return_type(node.body)
-        if return_type.unknown:
+        if return_type is None:
             return None
         return FSig(
             name=node.name,
@@ -66,42 +66,13 @@ class Inferno:
             return_type=return_type,
         )
 
-    def _get_return_type(self, nodes: Iterable[astroid.NodeNG]) -> Type:
+    def _get_return_type(self, nodes: Iterable[astroid.NodeNG]) -> Type | None:
         """
         Recursively walk the given body, find all return stmts,
         and infer their type. The result is a union of these types.
         """
-        result = Type.new('')
-        # if a `yield`, `yield from`, or non-bare `return` found
-        returns_value = False
-        for node in self._walk(nodes):
-            if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
-                returns_value = True
-            if not isinstance(node, astroid.Return):
-                continue
-            # bare return
-            if node.value is None:
-                result = result.merge(Type.new('None'))
-                continue
-            returns_value = True
-            node_type = get_type(node.value)
-            if node_type is None:
-                result = result.add_ass(Ass.ALL_RETURNS_SAME)
-            else:
-                result = result.merge(node_type)
-        if not returns_value:
-            return Type.new('None')
-        return result
-
-    @staticmethod
-    def _walk(nodes: Iterable[astroid.NodeNG]) -> Iterator[astroid.NodeNG]:
-        stack = deque(nodes)
-        while stack:
-            node = stack.pop()
-            if isinstance(node, (astroid.FunctionDef, astroid.ClassDef)):
-                continue
-            doc_node = getattr(node, 'doc_node', None)
-            if doc_node is not None and doc_node is not node:
-                stack.append(doc_node)
-            stack.extend(node.get_children())
-            yield node
+        for extractor in extractors:
+            ret_type = extractor(nodes)
+            if not ret_type.unknown:
+                return ret_type
+        return None
