@@ -16,6 +16,18 @@ def register(extractor: Extractor) -> Extractor:
     return extractor
 
 
+def get_return_type(nodes: Iterable[astroid.NodeNG]) -> Type | None:
+    """
+    Recursively walk the given body, find all return stmts,
+    and infer their type. The result is a union of these types.
+    """
+    for extractor in extractors:
+        ret_type = extractor(nodes)
+        if not ret_type.unknown:
+            return ret_type
+    return None
+
+
 def walk(nodes: Iterable[astroid.NodeNG]) -> Iterator[astroid.NodeNG]:
     stack = deque(nodes)
     while stack:
@@ -57,3 +69,11 @@ def _extract_no_return(nodes: Iterable[astroid.NodeNG]) -> Type:
         if isinstance(node, astroid.Return) and node.value is not None:
             return Type.new('')
     return Type.new('None')
+
+
+@register
+def _extract_yield(nodes: Iterable[astroid.NodeNG]) -> Type:
+    for node in walk(nodes):
+        if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
+            return Type.new('Iterator', module='typing')
+    return Type.new('')

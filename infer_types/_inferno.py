@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import Iterator
 
 import astroid
-from astypes import Type
 from ._fsig import FSig
-from ._extractors import extractors
+from ._extractors import get_return_type
 
 
 @dataclass
@@ -57,7 +56,7 @@ class Inferno:
     def infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:
             return None
-        return_type = self._get_return_type(node.body)
+        return_type = get_return_type(node.body)
         if return_type is None:
             return None
         return FSig(
@@ -65,14 +64,3 @@ class Inferno:
             args=node.args.as_string(),
             return_type=return_type,
         )
-
-    def _get_return_type(self, nodes: Iterable[astroid.NodeNG]) -> Type | None:
-        """
-        Recursively walk the given body, find all return stmts,
-        and infer their type. The result is a union of these types.
-        """
-        for extractor in extractors:
-            ret_type = extractor(nodes)
-            if not ret_type.unknown:
-                return ret_type
-        return None

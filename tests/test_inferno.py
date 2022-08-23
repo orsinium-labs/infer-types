@@ -191,20 +191,29 @@ def test_import_types(tmp_path, g_imp, g_expr, e_imp, e_type):
 
 
 def test_detect_bare_return(tmp_path):
-    source = dedent(f"""
+    source = dedent("""
         def f(x):
             if x:
                 return
             do_something()
     """)
     result = get_stubs(tmp_path, source)
-    assert result == f'def f(x) -> None: ...'
+    assert result == 'def f(x) -> None: ...'
 
 
 def test_detect_no_return(tmp_path):
-    source = dedent(f"""
+    source = dedent("""
         def f():
             do_something()
     """)
     result = get_stubs(tmp_path, source)
-    assert result == f'def f() -> None: ...'
+    assert result == 'def f() -> None: ...'
+
+
+def test_detect_yield(tmp_path):
+    source = dedent("""
+        def f():
+            yield x
+    """)
+    result = get_stubs(tmp_path, source)
+    assert result == 'from typing import Iterator\ndef f() -> Iterator: ...'
