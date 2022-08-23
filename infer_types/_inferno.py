@@ -72,18 +72,25 @@ class Inferno:
         and infer their type. The result is a union of these types.
         """
         result = Type.new('')
+        # if a `yield`, `yield from`, or non-bare `return` found
+        returns_value = False
         for node in self._walk(nodes):
+            if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
+                returns_value = True
             if not isinstance(node, astroid.Return):
                 continue
             # bare return
             if node.value is None:
                 result = result.merge(Type.new('None'))
                 continue
+            returns_value = True
             node_type = get_type(node.value)
             if node_type is None:
                 result = result.add_ass(Ass.ALL_RETURNS_SAME)
             else:
                 result = result.merge(node_type)
+        if not returns_value:
+            return Type.new('None')
         return result
 
     @staticmethod
