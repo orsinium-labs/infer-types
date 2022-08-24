@@ -83,9 +83,9 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
         try:
             method_def = module[cls_name].child_nodes[func_name]
         except KeyError:
-            return Type.new('')
+            continue
         if not isinstance(method_def.ast, ast.FunctionDef):
-            return Type.new('')
+            continue
         type_node = method_def.ast.returns
         return_type = _conv_node_to_type(type_node)
         if return_type is not None:
