@@ -1,13 +1,15 @@
 from __future__ import annotations
+import ast
 from collections import deque
 
-from typing import Callable, Iterable, Iterator
+from typing import Callable, Iterator
 
 import astroid
+import typeshed_client
 from astypes import Type, get_type, Ass
 
 
-Extractor = Callable[[Iterable[astroid.NodeNG]], Type]
+Extractor = Callable[[astroid.FunctionDef], Type]
 extractors: list[Extractor] = []
 
 
@@ -16,20 +18,20 @@ def register(extractor: Extractor) -> Extractor:
     return extractor
 
 
-def get_return_type(nodes: Iterable[astroid.NodeNG]) -> Type | None:
+def get_return_type(func_node: astroid.FunctionDef) -> Type | None:
     """
     Recursively walk the given body, find all return stmts,
     and infer their type. The result is a union of these types.
     """
     for extractor in extractors:
-        ret_type = extractor(nodes)
+        ret_type = extractor(func_node)
         if not ret_type.unknown:
             return ret_type
     return None
 
 
-def walk(nodes: Iterable[astroid.NodeNG]) -> Iterator[astroid.NodeNG]:
-    stack = deque(nodes)
+def walk(func_node: astroid.FunctionDef) -> Iterator[astroid.NodeNG]:
+    stack: deque[astroid.NodeNG] = deque(func_node.body)
     while stack:
         node = stack.pop()
         if isinstance(node, (astroid.FunctionDef, astroid.ClassDef)):
@@ -42,9 +44,9 @@ def walk(nodes: Iterable[astroid.NodeNG]) -> Iterator[astroid.NodeNG]:
 
 
 @register
-def _extract_astypes(nodes: Iterable[astroid.NodeNG]) -> Type:
+def _extract_astypes(func_node: astroid.FunctionDef) -> Type:
     result = Type.new('')
-    for node in walk(nodes):
+    for node in walk(func_node):
         if not isinstance(node, astroid.Return):
             continue
         # bare return
@@ -62,8 +64,55 @@ def _extract_astypes(nodes: Iterable[astroid.NodeNG]) -> Type:
 
 
 @register
-def _extract_no_return(nodes: Iterable[astroid.NodeNG]) -> Type:
-    for node in walk(nodes):
+def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
+    for node in func_node.node_ancestors():
+        if isinstance(node, astroid.ClassDef):
+            cls_node = node
+            break
+    else:
+        return Type.new('')
+    for parent in cls_node.getattr(func_node.name):
+        if not isinstance(parent, astroid.BoundMethod):
+            continue
+        qname: str = parent.qname()
+        mod_name, cls_name, func_name = qname.split('.')
+        assert func_name == func_node.name
+        module = typeshed_client.get_stub_names(mod_name)
+        if module is None:
+            continue
+        try:
+            method_def = module[cls_name].child_nodes[func_name]
+        except KeyError:
+            return Type.new('')
+        if not isinstance(method_def.ast, ast.FunctionDef):
+            return Type.new('')
+        type_node = method_def.ast.returns
+        return_type = _conv_node_to_type(type_node)
+        if return_type is not None:
+            return return_type
+    return Type.new('')
+
+
+def _conv_node_to_type(node: ast.AST | None) -> Type | None:
+    import builtins
+    import typing
+
+    if node is None:
+        return None
+    # for regular name, check if it is a typing primitive or a built-in
+    if isinstance(node, ast.Name):
+        name = node.id
+        if hasattr(builtins, name):
+            return Type.new(name, ass={Ass.NO_SHADOWING})
+        if name in typing.__all__:
+            return Type.new(name, module='typing')
+        return None
+    return None
+
+
+@register
+def _extract_no_return(func_node: astroid.FunctionDef) -> Type:
+    for node in walk(func_node):
         if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
             return Type.new('')
         if isinstance(node, astroid.Return) and node.value is not None:
@@ -72,8 +121,8 @@ def _extract_no_return(nodes: Iterable[astroid.NodeNG]) -> Type:
 
 
 @register
-def _extract_yield(nodes: Iterable[astroid.NodeNG]) -> Type:
-    for node in walk(nodes):
+def _extract_yield(func_node: astroid.FunctionDef) -> Type:
+    for node in walk(func_node):
         if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
             return Type.new('Iterator', module='typing')
     return Type.new('')

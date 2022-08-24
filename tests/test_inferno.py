@@ -217,3 +217,17 @@ def test_detect_yield(tmp_path):
     """)
     result = get_stubs(tmp_path, source)
     assert result == 'from typing import Iterator\ndef f() -> Iterator: ...'
+
+
+def test_detect_magic_method(tmp_path):
+    source = dedent("""
+        class A:
+            def __str__(self):
+                return x
+    """)
+    result = get_stubs(tmp_path, source)
+    expected = dedent("""
+        class A:
+            def __str__(self) -> str: ...
+    """)
+    assert result.strip() == expected.strip()

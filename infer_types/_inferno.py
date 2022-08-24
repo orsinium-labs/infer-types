@@ -56,7 +56,7 @@ class Inferno:
     def infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:
             return None
-        return_type = get_return_type(node.body)
+        return_type = get_return_type(node)
         if return_type is None:
             return None
         return FSig(
