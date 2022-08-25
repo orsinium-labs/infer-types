@@ -1,10 +1,11 @@
 from io import StringIO
 from pathlib import Path
+from textwrap import dedent
 from infer_types import main
 
 SOURCE = """
-def f(x):
-    return len(x)
+    def f(x):
+        return len(x)
 """
 
 
@@ -12,7 +13,7 @@ def test_main(tmp_path: Path):
     # prepare files and dirs
     source_path = tmp_path / 'source'
     source_path.mkdir()
-    (source_path / 'example.py').write_text(SOURCE)
+    (source_path / 'example.py').write_text(dedent(SOURCE))
     stubs_path = tmp_path / 'types'
 
     # call the CLI
