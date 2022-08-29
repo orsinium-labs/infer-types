@@ -46,6 +46,16 @@ def test_skip_subfuncs(get_stubs):
     assert result == 'def f(x) -> int: ...'
 
 
+def test_simplify_union_same_type(get_stubs):
+    result = get_stubs("""
+        def f(x):
+            if x == y:
+                return 12
+            return 13
+    """)
+    assert result == 'def f(x) -> int: ...'
+
+
 def test_cannot_infer_expr(get_stubs):
     result = get_stubs("""
         def f(x):
