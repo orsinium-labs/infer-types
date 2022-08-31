@@ -7,6 +7,7 @@ from typing import Callable, Iterator
 import astroid
 import typeshed_client
 from astypes import Type, get_type, Ass
+from astypes._helpers import conv_node_to_type
 
 
 Extractor = Callable[[astroid.FunctionDef], Type]
@@ -72,11 +73,20 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
     else:
         return Type.new('')
     for parent in cls_node.getattr(func_node.name):
-        if not isinstance(parent, astroid.BoundMethod):
+        if isinstance(parent, astroid.BoundMethod):
+            parent = parent._proxied
+        if not isinstance(parent, astroid.FunctionDef):
             continue
         qname: str = parent.qname()
         mod_name, cls_name, func_name = qname.split('.')
         assert func_name == func_node.name
+
+        # extract type from the return type annotation
+        return_type = conv_node_to_type(mod_name, parent.returns)
+        if return_type is not None:
+            return return_type
+
+        # extract type from typeshed
         module = typeshed_client.get_stub_names(mod_name)
         if module is None:
             continue
@@ -87,37 +97,10 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
         if not isinstance(method_def.ast, ast.FunctionDef):
             continue
         type_node = method_def.ast.returns
-        return_type = _conv_node_to_type(type_node)
+        return_type = conv_node_to_type(mod_name, type_node)
         if return_type is not None:
             return return_type
     return Type.new('')
-
-
-def _conv_node_to_type(node: ast.AST | None) -> Type | None:
-    import builtins
-    import typing
-
-    if node is None:
-        return None
-    # for regular name, check if it is a typing primitive or a built-in
-    if isinstance(node, ast.Name):
-        name = node.id
-        if hasattr(builtins, name):
-            return Type.new(name, ass={Ass.NO_SHADOWING})
-        if name in typing.__all__:
-            return Type.new(name, module='typing')
-        return None
-    return None
-
-
-@register
-def _extract_no_return(func_node: astroid.FunctionDef) -> Type:
-    for node in walk(func_node):
-        if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
-            return Type.new('')
-        if isinstance(node, astroid.Return) and node.value is not None:
-            return Type.new('')
-    return Type.new('None')
 
 
 @register
@@ -126,3 +109,11 @@ def _extract_yield(func_node: astroid.FunctionDef) -> Type:
         if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
             return Type.new('Iterator', module='typing')
     return Type.new('')
+
+
+@register
+def _extract_no_return(func_node: astroid.FunctionDef) -> Type:
+    for node in walk(func_node):
+        if isinstance(node, astroid.Return) and node.value is not None:
+            return Type.new('')
+    return Type.new('None')

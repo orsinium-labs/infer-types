@@ -231,3 +231,20 @@ def test_detect_magic_method(get_stubs):
             def __str__(self) -> str: ...
     """)
     assert result.strip() == expected.strip()
+
+
+def test_inherit(get_stubs):
+    result = get_stubs("""
+        class A:
+            def f(self) -> str:
+                return x
+
+        class B(A):
+            def f(self):
+                return y
+    """)
+    expected = dedent("""
+        class B:
+            def f(self) -> str: ...
+    """)
+    assert result.strip() == expected.strip()

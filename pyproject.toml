@@ -25,7 +25,11 @@ keywords = [
     "formatter",
     "code formatter",
 ]
-dependencies = ["astroid", "astypes"]
+dependencies = [
+    "astroid",
+    "astypes>=0.2.1",
+    "typeshed_client",
+]
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov"]
@@ -55,7 +59,7 @@ addopts = [
     "--cov=infer_types",
     "--cov-report=html",
     "--cov-report=term-missing:skip-covered",
-    "--cov-fail-under=86",
+    "--cov-fail-under=88",
 ]
 
 [tool.coverage.report]
