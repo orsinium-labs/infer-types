@@ -155,6 +155,65 @@ def transform(tmp_path: Path) -> Callable:
     def f() -> Iterator:
         yield x
     """,
+    # inherit types
+    """
+    class A:
+        def f(self) -> str:
+            return x
+
+    class B(A):
+        def f(self):
+            return y
+    ---
+    class A:
+        def f(self) -> str:
+            return x
+
+    class B(A):
+        def f(self) -> str:
+            return y
+    """,
+    # preserve decorators
+    """
+    from functools import cached_property
+
+    class C:
+        @cached_property
+        def m(self, x):
+            return 13
+    ---
+    from functools import cached_property
+
+    class C:
+        @cached_property
+        def m(self, x) -> int:
+            return 13
+    """,
+    # preserve multiple decorators
+    """
+    class C:
+        @property
+        @garbage
+        def m(self, x):
+            return 13
+    ---
+    class C:
+        @property
+        @garbage
+        def m(self, x) -> int:
+            return 13
+    """,
+    # insert imports for methods
+    """
+    class C:
+        def m(self, x):
+            yield 12
+    ---
+    from typing import Iterator
+    class C:
+        def m(self, x) -> Iterator:
+            yield 12
+    """,
 ])
 def test_inferno(transform, fused: str) -> None:
     given, expected = fused.split('---')
@@ -186,79 +245,32 @@ def test_preserve_args(transform, expr):
     assert transform(given) == dedent(expected)
 
 
-# def test_preserve_property_decorator(transform):
-#     actual = transform("""
-#         class C:
-#             @property
-#             @garbage
-#             def m(self, x):
-#                 return 13
-#     """)
-#     expected = dedent("""
-#         class C:
-#             @property
-#             def m(self, x) -> int: ...
-#     """)
-#     lactual = [line for line in actual.splitlines() if line]
-#     lexpected = [line for line in expected.splitlines() if line]
-#     assert lactual == lexpected
+@pytest.mark.parametrize('g_imp, g_expr, e_imp, e_type', [
+    (
+        'import datetime', 'datetime.date(1,2,3)',
+        'from datetime import date', 'date',
+    ),
+    (
+        'from datetime import date', 'date(1,2,3)',
+        'from datetime import date', 'date',
+    ),
+    (
+        'import ast', 'ast.walk(x)',
+        'from typing import Iterator', 'Iterator',
+    ),
+])
+def test_import_types(transform, g_imp, g_expr, e_imp, e_type):
+    given = f"""
+        {g_imp}
 
+        def f():
+            return {g_expr}
+    """
+    expected = f"""
+        {g_imp}
 
-# def test_preserve_cached_property_decorator(transform):
-#     actual = transform("""
-#         from functools import cached_property
-#         class C:
-#             @cached_property
-#             def m(self, x):
-#                 return 13
-#     """)
-#     expected = dedent("""
-#         from functools import cached_property
-#         class C:
-#             @cached_property
-#             def m(self, x) -> int: ...
-#     """)
-#     lactual = [line for line in actual.splitlines() if line]
-#     lexpected = [line for line in expected.splitlines() if line]
-#     assert lactual == lexpected
-
-
-# @pytest.mark.parametrize('g_imp, g_expr, e_imp, e_type', [
-#     (
-#         'import datetime', 'datetime.date(1,2,3)',
-#         'from datetime import date', 'date',
-#     ),
-#     (
-#         'from datetime import date', 'date(1,2,3)',
-#         'from datetime import date', 'date',
-#     ),
-#     (
-#         'import ast', 'ast.walk(x)',
-#         'from typing import Iterator', 'Iterator',
-#     ),
-# ])
-# def test_import_types(transform, g_imp, g_expr, e_imp, e_type):
-#     result = transform(f"""
-#         {g_imp}
-
-#         def f():
-#             return {g_expr}
-#     """)
-#     assert result == f'{e_imp}\ndef f() -> {e_type}: ...'
-
-
-# def test_inherit(transform):
-#     result = transform("""
-#         class A:
-#             def f(self) -> str:
-#                 return x
-
-#         class B(A):
-#             def f(self):
-#                 return y
-#     """)
-#     expected = dedent("""
-#         class B:
-#             def f(self) -> str: ...
-#     """)
-#     assert result.strip() == expected.strip()
+        {e_imp}
+        def f() -> {e_type}:
+            return {g_expr}
+    """
+    assert transform(given) == dedent(expected)

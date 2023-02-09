@@ -41,14 +41,8 @@ class Inferno:
                 sig = self._infer_sig(subnode)
                 if sig is None:
                     continue
-                # dec_qname: str
-                # for dec_qname in subnode.decoratornames():
-                #     mod_name, _, dec_name = dec_qname.rpartition('.')
-                #     if mod_name != 'builtins':
-                #         imports.add(f'from {mod_name} import {dec_name}')
-                #     if mod_name:
-                #         sigs.append(f'    @{dec_name}')
-                # imports.update(sig.imports)
+                for import_stmt in sig.imports:
+                    yield InsertImport(node, import_stmt)
                 yield InsertReturnType(subnode, sig.annotation)
 
     def _infer_sig(self, node: astroid.FunctionDef) -> FSig | None:

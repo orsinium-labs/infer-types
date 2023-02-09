@@ -27,7 +27,7 @@ class InsertImport(Transformation):
 
     Currently, inserts it right after the function. Let isort fix it.
     """
-    node: astroid.FunctionDef
+    node: astroid.FunctionDef | astroid.ClassDef
     text: str
 
     def pick_position(self, tr: Transformer) -> tuple[int, int]:
