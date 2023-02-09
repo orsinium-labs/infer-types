@@ -41,10 +41,16 @@ python3 -m pip install infer-types
 python3 -m infer_types ./example/
 ```
 
-The infer-types tool uses the new fancy syntax for type annotations introduced in Python 3.10. So, instead of `Optional[str]` it will emit `str | None`. If your code is supposed to run on an older version of Python, add `from __future__ import annotations` at the beginning of each file. It will solve the issue and also make startup of your app faster. You can do that using [isort](https://github.com/PyCQA/isort):
+The tool will add new import statements that can be duplicated and are located not at the top of the file. To fix it, run [isort](https://github.com/PyCQA/isort):
 
 ```bash
-isort --add-import 'from __future__ import annotations' ./example/
+python3 -m isort ./example/
+```
+
+The infer-types tool uses the new fancy syntax for type annotations introduced in Python 3.10. So, instead of `Optional[str]` it will emit `str | None`. If your code is supposed to run on an older version of Python, add `from __future__ import annotations` at the beginning of each file. It will solve the issue and also make startup of your app faster. You can also do that with isort:
+
+```bash
+python3 -m isort --add-import 'from __future__ import annotations' ./example/
 ```
 
 See [awesome-python-typing](https://github.com/typeddjango/awesome-python-typing) for more tools to help you with annotating your code.
