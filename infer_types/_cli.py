@@ -25,6 +25,7 @@ class Config:
     imports: bool           # allow annotations requiring imports
     methods: bool           # allow annotating methods
     functions: bool         # allow annotating functions
+    assumptions: bool       # allow astypes to make assumptions
     dry: bool               # do not write changes in files
     stream: TextIO          # stdout
 
@@ -35,6 +36,7 @@ def add_annotations(root: Path, config: Config) -> None:
         imports=config.imports,
         methods=config.methods,
         functions=config.functions,
+        assumptions=config.assumptions,
     )
     for path in root.iterdir():
         if path.is_dir():
@@ -85,6 +87,10 @@ def main(argv: list[str], stream: TextIO) -> int:
         help='do not annotate functions',
     )
     parser.add_argument(
+        '--no-assumptions', action='store_true',
+        help='do not make any assumptions, annotate only when 100% sure',
+    )
+    parser.add_argument(
         '--exit-on-failure', action='store_true',
         help='do not suppress exceptions during inference',
     )
@@ -105,6 +111,7 @@ def main(argv: list[str], stream: TextIO) -> int:
         imports=not args.no_imports,
         methods=not args.no_methods,
         functions=not args.no_functions,
+        assumptions=not args.no_assumptions,
         dry=args.dry,
         stream=stream,
     )

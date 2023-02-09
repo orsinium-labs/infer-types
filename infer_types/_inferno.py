@@ -23,6 +23,7 @@ class Inferno:
     imports: bool = True
     methods: bool = True
     functions: bool = True
+    assumptions: bool = True
 
     def transform(self, path: Path) -> str:
         source = path.read_text()
@@ -71,6 +72,8 @@ class Inferno:
             return None
         return_type = get_return_type(node)
         if return_type is None:
+            return None
+        if not self.assumptions and return_type.assumptions:
             return None
         return FSig(
             name=node.name,

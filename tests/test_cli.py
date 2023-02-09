@@ -247,3 +247,33 @@ def test_no_functions(tmp_path: Path):
     code = main([str(tmp_path), '--no-functions'], stream)
     assert code == 0
     assert source_file.read_text() == dedent(expected)
+
+
+def test_no_assumptions(tmp_path: Path):
+    given = """
+        def f1():
+            return 1
+
+        def f2(x):
+            if x:
+                return x
+            return 1
+    """
+    expected = """
+        def f1() -> int:
+            return 1
+
+        def f2(x):
+            if x:
+                return x
+            return 1
+    """
+
+    # prepare files and dirs
+    source_file = tmp_path / 'example.py'
+    source_file.write_text(dedent(given))
+    # call the CLI
+    stream = StringIO()
+    code = main([str(tmp_path), '--no-assumptions'], stream)
+    assert code == 0
+    assert source_file.read_text() == dedent(expected)
