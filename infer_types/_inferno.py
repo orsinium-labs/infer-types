@@ -48,7 +48,7 @@ class Inferno:
                 #     if mod_name:
                 #         sigs.append(f'    @{dec_name}')
                 # imports.update(sig.imports)
-                yield InsertReturnType(node, sig.annotation)
+                yield InsertReturnType(subnode, sig.annotation)
 
     def _infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:

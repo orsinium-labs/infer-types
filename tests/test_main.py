@@ -8,14 +8,17 @@ SOURCE = """
         return len(x)
 """
 
+EXPECTED = """
+    def f(x) -> int:
+        return len(x)
+"""
+
 
 def test_main(tmp_path: Path):
-    spath = tmp_path / 'source'
-    spath.mkdir()
-    (spath / 'example.py').write_text(dedent(SOURCE))
-    tpath = tmp_path / 'types'
-    flags = ['--pyi-dir', str(tpath), str(spath)]
-    res = subprocess.run([sys.executable, '-m', 'infer_types', *flags])
+    source_dir = tmp_path / 'source'
+    source_dir.mkdir()
+    source_file = source_dir / 'example.py'
+    source_file.write_text(dedent(SOURCE))
+    res = subprocess.run([sys.executable, '-m', 'infer_types', str(source_dir)])
     assert res.returncode == 0
-    out_path = tpath / 'example.pyi'
-    assert out_path.exists()
+    assert source_file.read_text() == dedent(EXPECTED)
