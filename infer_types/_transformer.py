@@ -1,7 +1,8 @@
 from __future__ import annotations
+
+import tokenize
 from dataclasses import dataclass, field
 from functools import cached_property
-import tokenize
 
 import astroid
 

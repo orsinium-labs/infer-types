@@ -3,6 +3,7 @@ from textwrap import dedent
 from typing import Callable
 
 import pytest
+
 from infer_types._inferno import Inferno
 
 

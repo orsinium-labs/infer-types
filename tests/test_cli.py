@@ -1,7 +1,9 @@
 from io import StringIO
 from pathlib import Path
 from textwrap import dedent
+
 from infer_types import main
+
 
 GIVEN = """
     def f(x):
