@@ -4,20 +4,23 @@ from functools import cached_property
 from pathlib import Path
 import tokenize
 
+import astroid
+
 
 @dataclass(frozen=True)
 class InsertReturnType:
     """Insert the return type annotation into the function at the given line.
     """
-    line: int
+    node: astroid.FunctionDef
     text: str
 
     def pick_position(self, tr: Transformer) -> tuple[int, int]:
         assert tr.colons, 'no colons found'
-        for line, col in tr.colons:
-            if line >= self.line:
+        node = self.node.doc_node or self.node.body[0]
+        for line, col in reversed(tr.colons):
+            if line < node.lineno:
                 return (line, col)
-        msg = f'cannot find colon matching the function at {self.line}'
+        msg = f'cannot find colon matching the function {self.node.name}'
         raise LookupError(msg)
 
     def as_str(self) -> str:
@@ -44,7 +47,7 @@ class Transformer:
         self.path.write_text(new_text, encoding='utf8')
 
     def _transform(self, text: str) -> str:
-        self._transforms.sort(key=lambda t: t.line, reverse=True)
+        self._transforms.sort(key=lambda t: t.node.lineno, reverse=True)
         lines = text.splitlines(keepends=True)
         for transform in self._transforms:
             lineno, col = transform.pick_position(self)
