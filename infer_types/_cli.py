@@ -18,16 +18,20 @@ except ImportError:
 
 @dataclass(frozen=True)
 class Config:
-    format: bool
-    skip_tests: bool
-    skip_migrations: bool
-    exit_on_failure: bool
-    dry: bool
-    stream: TextIO
+    format: bool            # run code formatters
+    skip_tests: bool        # skip `test_*` files
+    skip_migrations: bool   # skip `migrations/`
+    exit_on_failure: bool   # propagate exceptions
+    imports: bool           # allow annotations requiring imports
+    dry: bool               # do not write changes in files
+    stream: TextIO          # stdout
 
 
 def add_annotations(root: Path, config: Config) -> None:
-    inferno = Inferno()
+    inferno = Inferno(
+        safe=not config.exit_on_failure,
+        imports=config.imports,
+    )
     for path in root.iterdir():
         if path.is_dir():
             if config.skip_migrations and path.name == 'migrations':
@@ -38,7 +42,7 @@ def add_annotations(root: Path, config: Config) -> None:
             continue
         if config.skip_tests and path.name.startswith('test_'):
             continue
-        new_source = inferno.transform(path, safe=not config.exit_on_failure)
+        new_source = inferno.transform(path)
         if config.format:
             new_source = format_code(new_source)
         if not config.dry:
@@ -65,6 +69,10 @@ def main(argv: list[str], stream: TextIO) -> int:
         help='skip Django migration files',
     )
     parser.add_argument(
+        '--no-imports', action='store_true',
+        help='do not write annotations requiring imports',
+    )
+    parser.add_argument(
         '--exit-on-failure', action='store_true',
         help='do not suppress exceptions during inference',
     )
@@ -82,6 +90,7 @@ def main(argv: list[str], stream: TextIO) -> int:
         skip_tests=args.skip_tests,
         skip_migrations=args.skip_migrations,
         exit_on_failure=args.exit_on_failure or args.pdb,
+        imports=not args.no_imports,
         dry=args.dry,
         stream=stream,
     )
