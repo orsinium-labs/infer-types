@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from logging import getLogger
 from pathlib import Path
 from typing import Iterator
 
@@ -10,20 +11,28 @@ from ._extractors import get_return_type
 from ._transformer import Transformer, InsertReturnType, InsertImport, Transformation
 
 
+logger = getLogger(__name__)
+
+
 @dataclass
 class Inferno:
-    def transform(self, path: Path) -> str:
+    def transform(self, path: Path, safe: bool = False) -> str:
         source = path.read_text()
         tr = Transformer(source)
         root = astroid.parse(source, path=str(path))
         for node in root.body:
-            for transform in self._get_transforms_for_node(node):
+            try:
+                transforms = list(self._get_transforms_for_node(node))
+            except Exception:
+                if not safe:
+                    raise
+                logger.exception(f'failed inference for {path}:{node.lineno}')
+                continue
+            for transform in transforms:
                 tr.add(transform)
         return tr.apply()
 
-    def _get_transforms_for_node(
-        self, node: astroid.NodeNG,
-    ) -> Iterator[Transformation]:
+    def _get_transforms_for_node(self, node: astroid.NodeNG) -> Iterator[Transformation]:
         # infer return type for function
         if isinstance(node, astroid.FunctionDef):
             sig = self._infer_sig(node)

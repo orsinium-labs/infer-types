@@ -66,6 +66,7 @@ addopts = [
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING",
+    "raise NotImplementedError",
     "    pass",
 ]
 

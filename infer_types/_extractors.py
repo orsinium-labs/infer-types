@@ -78,7 +78,7 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
         if not isinstance(parent, astroid.FunctionDef):
             continue
         qname: str = parent.qname()
-        mod_name, cls_name, func_name = qname.split('.')
+        mod_name, cls_name, func_name = qname.rsplit('.', maxsplit=2)
         assert func_name == func_node.name
 
         # extract type from the return type annotation

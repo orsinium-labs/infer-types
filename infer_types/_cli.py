@@ -9,12 +9,18 @@ from typing import NoReturn, TextIO
 from ._format import format_code
 from ._inferno import Inferno
 
+try:
+    import ipdb as pdb
+except ImportError:
+    import pdb  # type: ignore[no-redef]
+
 
 @dataclass(frozen=True)
 class Config:
     format: bool
     skip_tests: bool
     skip_migrations: bool
+    exit_on_failure: bool
     dry: bool
     stream: TextIO
 
@@ -31,7 +37,7 @@ def generate_stubs(root: Path, config: Config) -> None:
             continue
         if config.skip_tests and path.name.startswith('test_'):
             continue
-        new_source = inferno.transform(path)
+        new_source = inferno.transform(path, safe=not config.exit_on_failure)
         if config.format:
             new_source = format_code(new_source)
         if not config.dry:
@@ -58,6 +64,14 @@ def main(argv: list[str], stream: TextIO) -> int:
         help='skip Django migration files',
     )
     parser.add_argument(
+        '--exit-on-failure', action='store_true',
+        help='do not suppress exceptions during inference',
+    )
+    parser.add_argument(
+        '--pdb', action='store_true',
+        help='start debugger on failure',
+    )
+    parser.add_argument(
         '--dry', action='store_true',
         help='do not modify any files',
     )
@@ -66,10 +80,14 @@ def main(argv: list[str], stream: TextIO) -> int:
         format=args.format,
         skip_tests=args.skip_tests,
         skip_migrations=args.skip_migrations,
+        exit_on_failure=args.exit_on_failure or args.pdb,
         dry=args.dry,
         stream=stream,
     )
-    generate_stubs(args.dir, config)
+    try:
+        generate_stubs(args.dir, config)
+    except Exception:  # pragma: no cover
+        pdb.post_mortem()
     return 0
 
 
