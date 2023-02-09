@@ -6,8 +6,43 @@ import tokenize
 import astroid
 
 
+class Transformation:
+
+    def pick_position(self, tr: Transformer) -> tuple[int, int]:
+        raise NotImplementedError
+
+    def as_str(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def position(self) -> tuple[int, int]:
+        """Approximated position of the change, used to order transformations.
+        """
+        raise NotImplementedError
+
+
 @dataclass(frozen=True)
-class InsertReturnType:
+class InsertImport(Transformation):
+    """Insert import statement required for the function annotations.
+
+    Currently, inserts it right after the function. Let isort fix it.
+    """
+    node: astroid.FunctionDef
+    text: str
+
+    def pick_position(self, tr: Transformer) -> tuple[int, int]:
+        return (self.node.lineno, self.node.col_offset)
+
+    def as_str(self) -> str:
+        return f'{self.text}\n'
+
+    @property
+    def position(self) -> tuple[int, int]:
+        return (self.node.lineno, self.node.col_offset)
+
+
+@dataclass(frozen=True)
+class InsertReturnType(Transformation):
     """Insert the return type annotation into the function at the given line.
     """
     node: astroid.FunctionDef
@@ -25,15 +60,19 @@ class InsertReturnType:
     def as_str(self) -> str:
         return f' -> {self.text}'
 
+    @property
+    def position(self) -> tuple[int, int]:
+        return (self.node.lineno, self.node.col_offset + 1)
+
 
 @dataclass(frozen=True)
 class Transformer:
     """Insert snippets of text into the source code.
     """
     source: str
-    _transforms: list[InsertReturnType] = field(default_factory=list)
+    _transforms: list[Transformation] = field(default_factory=list)
 
-    def add(self, transform: InsertReturnType) -> None:
+    def add(self, transform: Transformation) -> None:
         """Add new transformation to pending.
         """
         self._transforms.append(transform)
@@ -41,7 +80,7 @@ class Transformer:
     def apply(self) -> str:
         """Apply all pending transformations and return the transformed source code.
         """
-        self._transforms.sort(key=lambda t: t.node.lineno, reverse=True)
+        self._transforms.sort(key=lambda t: t.position, reverse=True)
         lines = self.source.splitlines(keepends=True)
         for transform in self._transforms:
             lineno, col = transform.pick_position(self)

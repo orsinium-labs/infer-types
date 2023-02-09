@@ -151,6 +151,7 @@ def transform(tmp_path: Path) -> Callable:
     def f():
         yield x
     ---
+    from typing import Iterator
     def f() -> Iterator:
         yield x
     """,

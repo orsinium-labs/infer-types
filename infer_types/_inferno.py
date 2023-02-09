@@ -7,7 +7,7 @@ from typing import Iterator
 import astroid
 from ._fsig import FSig
 from ._extractors import get_return_type
-from ._transformer import Transformer, InsertReturnType
+from ._transformer import Transformer, InsertReturnType, InsertImport, Transformation
 
 
 @dataclass
@@ -23,12 +23,13 @@ class Inferno:
 
     def _get_transforms_for_node(
         self, node: astroid.NodeNG,
-    ) -> Iterator[InsertReturnType]:
+    ) -> Iterator[Transformation]:
         # infer return type for function
         if isinstance(node, astroid.FunctionDef):
             sig = self._infer_sig(node)
             if sig is not None:
-                # yield from sig.imports
+                for import_stmt in sig.imports:
+                    yield InsertImport(node, import_stmt)
                 yield InsertReturnType(node, sig.annotation)
             return
 
