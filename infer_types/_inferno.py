@@ -17,9 +17,15 @@ from ._transformer import (
 logger = getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Inferno:
-    def transform(self, path: Path, safe: bool = False) -> str:
+    safe: bool = False
+    imports: bool = True
+    methods: bool = True
+    functions: bool = True
+    assumptions: bool = True
+
+    def transform(self, path: Path) -> str:
         source = path.read_text()
         tr = Transformer(source)
         root = astroid.parse(source, path=str(path))
@@ -27,7 +33,7 @@ class Inferno:
             try:
                 transforms = list(self._get_transforms_for_node(node))
             except Exception:
-                if not safe:
+                if not self.safe:
                     raise
                 logger.exception(f'failed inference for {path}:{node.lineno}')
                 continue
@@ -37,21 +43,25 @@ class Inferno:
 
     def _get_transforms_for_node(self, node: astroid.NodeNG) -> Iterator[Transformation]:
         # infer return type for function
-        if isinstance(node, astroid.FunctionDef):
+        if self.functions and isinstance(node, astroid.FunctionDef):
             sig = self._infer_sig(node)
             if sig is not None:
+                if not self.imports and sig.imports:
+                    return
                 for import_stmt in sig.imports:
                     yield InsertImport(node, import_stmt)
                 yield InsertReturnType(node, sig.annotation)
             return
 
         # infer return type for all methods of a class
-        if isinstance(node, astroid.ClassDef):
+        if self.methods and isinstance(node, astroid.ClassDef):
             for subnode in node.body:
                 if not isinstance(subnode, astroid.FunctionDef):
                     continue
                 sig = self._infer_sig(subnode)
                 if sig is None:
+                    continue
+                if not self.imports and sig.imports:
                     continue
                 for import_stmt in sig.imports:
                     yield InsertImport(node, import_stmt)
@@ -62,6 +72,8 @@ class Inferno:
             return None
         return_type = get_return_type(node)
         if return_type is None:
+            return None
+        if not self.assumptions and return_type.assumptions:
             return None
         return FSig(
             name=node.name,
