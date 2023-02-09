@@ -23,7 +23,7 @@ class Inferno:
     def _get_stubs_for_node(self, node: astroid.NodeNG) -> Iterator[str]:
         # infer return type for function
         if isinstance(node, astroid.FunctionDef):
-            sig = self.infer_sig(node)
+            sig = self._infer_sig(node)
             if sig is not None:
                 yield from sig.imports
                 yield sig.stub
@@ -36,7 +36,7 @@ class Inferno:
             for subnode in node.body:
                 if not isinstance(subnode, astroid.FunctionDef):
                     continue
-                sig = self.infer_sig(subnode)
+                sig = self._infer_sig(subnode)
                 if sig is None:
                     continue
                 dec_qname: str
@@ -53,7 +53,7 @@ class Inferno:
             yield f'class {node.name}:'
             yield from sigs
 
-    def infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
+    def _infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:
             return None
         return_type = get_return_type(node)

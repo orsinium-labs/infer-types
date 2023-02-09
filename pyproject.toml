@@ -39,7 +39,7 @@ Source = "https://github.com/orsinium-labs/infer-types"
 
 [tool.mypy]
 files = ["infer_types"]
-python_version = 3.7
+python_version = 3.8
 ignore_missing_imports = true
 # follow_imports = "silent"
 show_error_codes = true
