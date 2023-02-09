@@ -33,3 +33,93 @@ def test_main(tmp_path: Path):
 
     # check modifications
     assert source_file.read_text() == dedent(EXPECTED)
+
+
+def test_recursive_file_lookup(tmp_path: Path):
+    # prepare files and dirs
+    source_dir1 = tmp_path / 'source'
+    source_dir1.mkdir()
+    source_dir2 = source_dir1 / 'subdir'
+    source_dir2.mkdir()
+    source_file1 = source_dir1 / 'example1.py'
+    source_file2 = source_dir2 / 'example2.py'
+    source_file1.write_text(dedent(GIVEN))
+    source_file2.write_text(dedent(GIVEN))
+
+    # call the CLI
+    stream = StringIO()
+    code = main([str(tmp_path)], stream)
+    assert code == 0
+
+    # check modifications
+    assert source_file1.read_text() == dedent(EXPECTED)
+    assert source_file2.read_text() == dedent(EXPECTED)
+
+
+def test_skip_migrations(tmp_path: Path):
+    # prepare files and dirs
+    source_dir = tmp_path / 'source'
+    source_dir.mkdir()
+    migrations_dir = source_dir / 'migrations'
+    migrations_dir.mkdir()
+    source_file = source_dir / 'example1.py'
+    migration_file = migrations_dir / 'example2.py'
+    source_file.write_text(dedent(GIVEN))
+    migration_file.write_text(dedent(GIVEN))
+
+    # call the CLI
+    stream = StringIO()
+    code = main([str(tmp_path), '--skip-migrations'], stream)
+    assert code == 0
+
+    # check modifications
+    assert source_file.read_text() == dedent(EXPECTED)
+    assert migration_file.read_text() == dedent(GIVEN)
+
+
+def test_skip_tests(tmp_path: Path):
+    # prepare files and dirs
+    source_dir = tmp_path / 'source'
+    source_dir.mkdir()
+    source_file = source_dir / 'example.py'
+    test_file = source_dir / 'test_example.py'
+    source_file.write_text(dedent(GIVEN))
+    test_file.write_text(dedent(GIVEN))
+
+    # call the CLI
+    stream = StringIO()
+    code = main([str(tmp_path), '--skip-tests'], stream)
+    assert code == 0
+
+    # check modifications
+    assert source_file.read_text() == dedent(EXPECTED)
+    assert test_file.read_text() == dedent(GIVEN)
+
+
+def test_skip_non_python(tmp_path: Path):
+    # prepare files and dirs
+    source_dir = tmp_path / 'source'
+    source_dir.mkdir()
+    source_file = source_dir / 'example.py'
+    ruby_file = source_dir / 'example.rb'
+    source_file.write_text(dedent(GIVEN))
+    ruby_file.write_text(dedent(GIVEN))
+
+    # call the CLI
+    stream = StringIO()
+    code = main([str(tmp_path)], stream)
+    assert code == 0
+
+    # check modifications
+    assert source_file.read_text() == dedent(EXPECTED)
+    assert ruby_file.read_text() == dedent(GIVEN)
+
+
+def test_format_doesnt_explode(tmp_path: Path):
+    # prepare files and dirs
+    source_file = tmp_path / 'example.py'
+    source_file.write_text(dedent(GIVEN))
+    # call the CLI
+    stream = StringIO()
+    code = main([str(tmp_path), '--format'], stream)
+    assert code == 0

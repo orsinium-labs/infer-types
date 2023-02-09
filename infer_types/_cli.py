@@ -25,13 +25,13 @@ class Config:
     stream: TextIO
 
 
-def generate_stubs(root: Path, config: Config) -> None:
+def add_annotations(root: Path, config: Config) -> None:
     inferno = Inferno()
     for path in root.iterdir():
         if path.is_dir():
             if config.skip_migrations and path.name == 'migrations':
                 continue
-            generate_stubs(path, config)
+            add_annotations(path, config)
             continue
         if path.suffix != '.py':
             continue
@@ -85,7 +85,7 @@ def main(argv: list[str], stream: TextIO) -> int:
         stream=stream,
     )
     try:
-        generate_stubs(args.dir, config)
+        add_annotations(args.dir, config)
     except Exception:  # pragma: no cover
         pdb.post_mortem()
     return 0
