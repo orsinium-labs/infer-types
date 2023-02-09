@@ -1,7 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import cached_property
-from pathlib import Path
 import tokenize
 
 import astroid
@@ -31,7 +30,7 @@ class InsertReturnType:
 class Transformer:
     """Insert snippets of text into the source code.
     """
-    path: Path
+    source: str
     _transforms: list[InsertReturnType] = field(default_factory=list)
 
     def add(self, transform: InsertReturnType) -> None:
@@ -39,16 +38,11 @@ class Transformer:
         """
         self._transforms.append(transform)
 
-    def apply(self) -> None:
-        """Apply all pending transformations in place.
+    def apply(self) -> str:
+        """Apply all pending transformations and return the transformed source code.
         """
-        old_text = self.path.read_text(encoding='utf8')
-        new_text = self._transform(old_text)
-        self.path.write_text(new_text, encoding='utf8')
-
-    def _transform(self, text: str) -> str:
         self._transforms.sort(key=lambda t: t.node.lineno, reverse=True)
-        lines = text.splitlines(keepends=True)
+        lines = self.source.splitlines(keepends=True)
         for transform in self._transforms:
             lineno, col = transform.pick_position(self)
             lineno -= 1
@@ -68,5 +62,5 @@ class Transformer:
 
     @cached_property
     def _tokens(self) -> tuple[tokenize.TokenInfo, ...]:
-        with self.path.open('rb') as stream:
-            return tuple(tokenize.tokenize(stream.__next__))
+        lines = self.source.encode('utf8').splitlines(keepends=True)
+        return tuple(tokenize.tokenize(iter(lines).__next__))
