@@ -88,7 +88,7 @@ def main(argv: list[str], stream: TextIO) -> int:
     )
     parser.add_argument(
         '--no-assumptions', action='store_true',
-        help='do not make any assumptions, annotate only when 100% sure',
+        help='do not make any assumptions, avoid false-positives',
     )
     parser.add_argument(
         '--exit-on-failure', action='store_true',
