@@ -7,7 +7,7 @@ The main scenario for using the tool is to help you with annotating a big and ol
 Features:
 
 + 100% automated, get a bunch of type annotations with no effort.
-+ Unix-way, does only one job and does it well.
++ 100% static, all types are inferred without running the code.
 + A lot of heuristics and smart inference.
 + Actively uses [typeshed](https://github.com/python/typeshed) to find annotations for unannotated dependencies.
 
@@ -32,28 +32,26 @@ class Database:
 ## Installation
 
 ```bash
-python3 -m pip install infer-types retype
+python3 -m pip install infer-types
 ```
 
-This will also install retype which we're going to use to apply generated type annotations back to the code (see Usage below).
-
 ## Usage
-
-First of all, run the tool:
 
 ```bash
 python3 -m infer_types ./example/
 ```
 
-It will infer types for all code in the `example` directory and save [stub files](https://mypy.readthedocs.io/en/stable/stubs.html) inside of `types` directory.
-
-The next thing you need to do is to apply the stub files back to the code. For that, we're going to use [retype](https://github.com/ambv/retype):
+The tool will add new import statements that can be duplicated and are located not at the top of the file. To fix it, run [isort](https://github.com/PyCQA/isort):
 
 ```bash
-retype -it ./example/ ./example/
+python3 -m isort ./example/
 ```
 
-The infer-types tool uses the new fancy syntax for type annotations introduced in Python 3.10. So, instead of `Optional[str]` it will emit `str | None`. If your code is supposed to run on an older version of Python, add `from __future__ import annotations` at the beginning of each file. It will solve the issue and also make startup of your app faster.
+The infer-types tool uses the new fancy syntax for type annotations introduced in Python 3.10. So, instead of `Optional[str]` it will emit `str | None`. If your code is supposed to run on an older version of Python, add `from __future__ import annotations` at the beginning of each file. It will solve the issue and also make startup of your app faster. You can also do that with isort:
+
+```bash
+python3 -m isort --add-import 'from __future__ import annotations' ./example/
+```
 
 See [awesome-python-typing](https://github.com/typeddjango/awesome-python-typing) for more tools to help you with annotating your code.
 

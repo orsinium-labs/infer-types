@@ -1,59 +1,60 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from logging import getLogger
 from pathlib import Path
 from typing import Iterator
 
 import astroid
 from ._fsig import FSig
 from ._extractors import get_return_type
+from ._transformer import Transformer, InsertReturnType, InsertImport, Transformation
+
+
+logger = getLogger(__name__)
 
 
 @dataclass
 class Inferno:
-    def generate_stub(self, path: Path) -> str:
+    def transform(self, path: Path, safe: bool = False) -> str:
         source = path.read_text()
+        tr = Transformer(source)
         root = astroid.parse(source, path=str(path))
-
-        result: list[str] = []
         for node in root.body:
-            result.extend(self._get_stubs_for_node(node))
-        return '\n'.join(result) + '\n'
+            try:
+                transforms = list(self._get_transforms_for_node(node))
+            except Exception:
+                if not safe:
+                    raise
+                logger.exception(f'failed inference for {path}:{node.lineno}')
+                continue
+            for transform in transforms:
+                tr.add(transform)
+        return tr.apply()
 
-    def _get_stubs_for_node(self, node: astroid.NodeNG) -> Iterator[str]:
+    def _get_transforms_for_node(self, node: astroid.NodeNG) -> Iterator[Transformation]:
         # infer return type for function
         if isinstance(node, astroid.FunctionDef):
-            sig = self.infer_sig(node)
+            sig = self._infer_sig(node)
             if sig is not None:
-                yield from sig.imports
-                yield sig.stub
+                for import_stmt in sig.imports:
+                    yield InsertImport(node, import_stmt)
+                yield InsertReturnType(node, sig.annotation)
             return
 
         # infer return type for all methods of a class
-        imports: set[str] = set()
-        sigs: list[str] = []
         if isinstance(node, astroid.ClassDef):
             for subnode in node.body:
                 if not isinstance(subnode, astroid.FunctionDef):
                     continue
-                sig = self.infer_sig(subnode)
+                sig = self._infer_sig(subnode)
                 if sig is None:
                     continue
-                dec_qname: str
-                for dec_qname in subnode.decoratornames():
-                    mod_name, _, dec_name = dec_qname.rpartition('.')
-                    if mod_name != 'builtins':
-                        imports.add(f'from {mod_name} import {dec_name}')
-                    if mod_name:
-                        sigs.append(f'    @{dec_name}')
-                imports.update(sig.imports)
-                sigs.append(f'    {sig.stub}')
-        yield from imports
-        if sigs:
-            yield f'class {node.name}:'
-            yield from sigs
+                for import_stmt in sig.imports:
+                    yield InsertImport(node, import_stmt)
+                yield InsertReturnType(subnode, sig.annotation)
 
-    def infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
+    def _infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:
             return None
         return_type = get_return_type(node)

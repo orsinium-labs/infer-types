@@ -39,7 +39,7 @@ Source = "https://github.com/orsinium-labs/infer-types"
 
 [tool.mypy]
 files = ["infer_types"]
-python_version = 3.7
+python_version = 3.8
 ignore_missing_imports = true
 # follow_imports = "silent"
 show_error_codes = true
@@ -59,13 +59,15 @@ addopts = [
     "--cov=infer_types",
     "--cov-report=html",
     "--cov-report=term-missing:skip-covered",
-    "--cov-fail-under=88",
+    "--cov-fail-under=91",
 ]
 
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING",
+    "raise NotImplementedError",
+    "except ImportError:",
     "    pass",
 ]
 
