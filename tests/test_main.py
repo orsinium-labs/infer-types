@@ -1,7 +1,8 @@
-from pathlib import Path
-import sys
 import subprocess
+import sys
+from pathlib import Path
 from textwrap import dedent
+
 
 SOURCE = """
     def f(x):

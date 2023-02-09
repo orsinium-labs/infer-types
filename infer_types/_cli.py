@@ -1,13 +1,14 @@
 from __future__ import annotations
-from dataclasses import dataclass
 
 import sys
 from argparse import ArgumentParser
+from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn, TextIO
 
 from ._format import format_code
 from ._inferno import Inferno
+
 
 try:
     import ipdb as pdb

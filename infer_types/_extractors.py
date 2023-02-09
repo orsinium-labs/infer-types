@@ -1,12 +1,12 @@
 from __future__ import annotations
+
 import ast
 from collections import deque
-
 from typing import Callable, Iterator
 
 import astroid
 import typeshed_client
-from astypes import Type, get_type, Ass
+from astypes import Ass, Type, get_type
 from astypes._helpers import conv_node_to_type
 
 
@@ -90,8 +90,10 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
         module = typeshed_client.get_stub_names(mod_name)
         if module is None:
             continue
+        child_nodes = module[cls_name].child_nodes
+        assert child_nodes is not None
         try:
-            method_def = module[cls_name].child_nodes[func_name]
+            method_def = child_nodes[func_name]
         except KeyError:
             continue
         if not isinstance(method_def.ast, ast.FunctionDef):

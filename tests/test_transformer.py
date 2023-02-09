@@ -1,6 +1,8 @@
 from textwrap import dedent
-from infer_types._transformer import Transformer, InsertReturnType
+
 import astroid
+
+from infer_types._transformer import InsertReturnType, Transformer
 
 
 def add_ret_ann(given: str, annotation: str) -> str:

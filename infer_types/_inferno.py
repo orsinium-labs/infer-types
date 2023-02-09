@@ -6,9 +6,12 @@ from pathlib import Path
 from typing import Iterator
 
 import astroid
-from ._fsig import FSig
+
 from ._extractors import get_return_type
-from ._transformer import Transformer, InsertReturnType, InsertImport, Transformation
+from ._fsig import FSig
+from ._transformer import (
+    InsertImport, InsertReturnType, Transformation, Transformer,
+)
 
 
 logger = getLogger(__name__)
