@@ -23,6 +23,8 @@ class Config:
     skip_migrations: bool   # skip `migrations/`
     exit_on_failure: bool   # propagate exceptions
     imports: bool           # allow annotations requiring imports
+    methods: bool           # allow annotating methods
+    functions: bool         # allow annotating functions
     dry: bool               # do not write changes in files
     stream: TextIO          # stdout
 
@@ -31,6 +33,8 @@ def add_annotations(root: Path, config: Config) -> None:
     inferno = Inferno(
         safe=not config.exit_on_failure,
         imports=config.imports,
+        methods=config.methods,
+        functions=config.functions,
     )
     for path in root.iterdir():
         if path.is_dir():
@@ -73,6 +77,14 @@ def main(argv: list[str], stream: TextIO) -> int:
         help='do not write annotations requiring imports',
     )
     parser.add_argument(
+        '--no-methods', action='store_true',
+        help='do not annotate methods',
+    )
+    parser.add_argument(
+        '--no-functions', action='store_true',
+        help='do not annotate functions',
+    )
+    parser.add_argument(
         '--exit-on-failure', action='store_true',
         help='do not suppress exceptions during inference',
     )
@@ -91,6 +103,8 @@ def main(argv: list[str], stream: TextIO) -> int:
         skip_migrations=args.skip_migrations,
         exit_on_failure=args.exit_on_failure or args.pdb,
         imports=not args.no_imports,
+        methods=not args.no_methods,
+        functions=not args.no_functions,
         dry=args.dry,
         stream=stream,
     )
