@@ -20,6 +20,8 @@ jobs:
         with:
           python-version: "3.8"
       - uses: arduino/setup-task@v1
+        with:
+          repo-token: ${{ github.token }}
       - run: task lint
 
   test:
@@ -34,6 +36,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - uses: arduino/setup-task@v1
+        with:
+          repo-token: ${{ github.token }}
       - run: task pytest
 
   markdownlint-cli:
