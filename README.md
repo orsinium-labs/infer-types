@@ -61,3 +61,6 @@ See [awesome-python-typing](https://github.com/typeddjango/awesome-python-typing
 + If the same method is defined in a base class, copy the type annotations from there.
 + If there are no return statements returning a value, the return type is `None`.
 + If there is a `yield` statement, the return type is `typing.Iterator`.
++ In some cases, the return type can be guessed from the function name. For example, `is_open` function is assumed to return `bool` because it starts with `is_`.
+
+You can run only a specific heuristic using the `--only` flag.
