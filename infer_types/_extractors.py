@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import ast
+import builtins
 from collections import deque
+from types import MappingProxyType
 from typing import Callable, Iterator
 
 import astroid
@@ -11,20 +13,38 @@ from astypes._helpers import conv_node_to_type
 
 
 Extractor = Callable[[astroid.FunctionDef], Type]
-extractors: list[Extractor] = []
+extractors: list[tuple[str, Extractor]] = []
 
 
-def register(extractor: Extractor) -> Extractor:
-    extractors.append(extractor)
-    return extractor
+KNOWN_NAMES = MappingProxyType({
+    'dumps': 'str',
+    'exists': 'bool',
+    'contains': 'bool',
+    'count': 'int',
+    'size': 'int',
+})
+REMOVE_PREFIXES = ('as_', 'to_', 'get_')
+BOOL_PREFIXES = ('is_', 'has_', 'should_', 'can_', 'will_', 'supports_')
 
 
-def get_return_type(func_node: astroid.FunctionDef) -> Type | None:
+def register(name: str) -> Callable[[Extractor], Extractor]:
+    def callback(extractor: Extractor) -> Extractor:
+        extractors.append((name, extractor))
+        return extractor
+    return callback
+
+
+def get_return_type(
+    func_node: astroid.FunctionDef,
+    names: frozenset[str],
+) -> Type | None:
     """
     Recursively walk the given body, find all return stmts,
     and infer their type. The result is a union of these types.
     """
-    for extractor in extractors:
+    for name, extractor in extractors:
+        if names and name not in names:
+            continue
         ret_type = extractor(func_node)
         if not ret_type.unknown:
             return ret_type
@@ -44,7 +64,7 @@ def walk(func_node: astroid.FunctionDef) -> Iterator[astroid.NodeNG]:
         yield node
 
 
-@register
+@register(name='astypes')
 def _extract_astypes(func_node: astroid.FunctionDef) -> Type:
     result = Type.new('')
     for node in walk(func_node):
@@ -64,7 +84,7 @@ def _extract_astypes(func_node: astroid.FunctionDef) -> Type:
     return result
 
 
-@register
+@register(name='inherit')
 def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
     for node in func_node.node_ancestors():
         if isinstance(node, astroid.ClassDef):
@@ -105,7 +125,7 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
     return Type.new('')
 
 
-@register
+@register(name='yield')
 def _extract_yield(func_node: astroid.FunctionDef) -> Type:
     for node in walk(func_node):
         if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
@@ -113,9 +133,28 @@ def _extract_yield(func_node: astroid.FunctionDef) -> Type:
     return Type.new('')
 
 
-@register
+@register(name='none')
 def _extract_no_return(func_node: astroid.FunctionDef) -> Type:
     for node in walk(func_node):
         if isinstance(node, astroid.Return) and node.value is not None:
             return Type.new('')
     return Type.new('None')
+
+
+@register(name='name')
+def _extract_from_name(func_node: astroid.FunctionDef) -> Type:
+    """Try to guess the return type based on the function name.
+    """
+    name: str = func_node.name
+    name = name.lstrip('_')
+    # TODO(@orsinium): use str.removeprefix when migrating to 3.9
+    for prefix in REMOVE_PREFIXES:
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+    if name.startswith(BOOL_PREFIXES):
+        return Type.new('bool')
+    if name.endswith('_at'):
+        return Type.new('datetime', module='datetime')
+    if hasattr(builtins, name):
+        return Type.new(name)
+    return Type.new(KNOWN_NAMES.get(name, ''))

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn, TextIO
 
+from ._extractors import extractors
 from ._format import format_code
 from ._inferno import Inferno
 
@@ -27,6 +28,7 @@ class Config:
     functions: bool         # allow annotating functions
     assumptions: bool       # allow astypes to make assumptions
     dry: bool               # do not write changes in files
+    only: frozenset[str]    # run only the these extractors
     stream: TextIO          # stdout
 
 
@@ -37,6 +39,7 @@ def add_annotations(root: Path, config: Config) -> None:
         methods=config.methods,
         functions=config.functions,
         assumptions=config.assumptions,
+        only=config.only,
     )
     for path in root.iterdir():
         if path.is_dir():
@@ -60,7 +63,11 @@ def main(argv: list[str], stream: TextIO) -> int:
     parser = ArgumentParser()
     parser.add_argument(
         'dir', type=Path, default=Path(),
-        help='path to directory with the source code to analyze'
+        help='path to the directory with the source code to analyze',
+    )
+    parser.add_argument(
+        '--only', nargs='*', choices=sorted(name for name, _ in extractors),
+        help='list of extractors to run (all by default)',
     )
     parser.add_argument(
         '--format', action='store_true',
@@ -104,15 +111,16 @@ def main(argv: list[str], stream: TextIO) -> int:
     )
     args = parser.parse_args(argv)
     config = Config(
-        format=args.format,
-        skip_tests=args.skip_tests,
-        skip_migrations=args.skip_migrations,
-        exit_on_failure=args.exit_on_failure or args.pdb,
-        imports=not args.no_imports,
-        methods=not args.no_methods,
-        functions=not args.no_functions,
         assumptions=not args.no_assumptions,
         dry=args.dry,
+        exit_on_failure=args.exit_on_failure or args.pdb,
+        format=args.format,
+        functions=not args.no_functions,
+        imports=not args.no_imports,
+        methods=not args.no_methods,
+        only=args.only,
+        skip_migrations=args.skip_migrations,
+        skip_tests=args.skip_tests,
         stream=stream,
     )
     try:
