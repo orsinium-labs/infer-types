@@ -13,7 +13,7 @@ from astypes._helpers import conv_node_to_type
 
 
 Extractor = Callable[[astroid.FunctionDef], Type]
-extractors: list[Extractor] = []
+extractors: list[tuple[str, Extractor]] = []
 
 
 KNOWN_NAMES = MappingProxyType({
@@ -27,17 +27,24 @@ REMOVE_PREFIXES = ('as_', 'to_', 'get_')
 BOOL_PREFIXES = ('is_', 'has_', 'should_', 'can_', 'will_', 'supports_')
 
 
-def register(extractor: Extractor) -> Extractor:
-    extractors.append(extractor)
-    return extractor
+def register(name: str) -> Callable[[Extractor], Extractor]:
+    def callback(extractor: Extractor) -> Extractor:
+        extractors.append((name, extractor))
+        return extractor
+    return callback
 
 
-def get_return_type(func_node: astroid.FunctionDef) -> Type | None:
+def get_return_type(
+    func_node: astroid.FunctionDef,
+    names: frozenset[str],
+) -> Type | None:
     """
     Recursively walk the given body, find all return stmts,
     and infer their type. The result is a union of these types.
     """
-    for extractor in extractors:
+    for name, extractor in extractors:
+        if names and name not in names:
+            continue
         ret_type = extractor(func_node)
         if not ret_type.unknown:
             return ret_type
@@ -57,7 +64,7 @@ def walk(func_node: astroid.FunctionDef) -> Iterator[astroid.NodeNG]:
         yield node
 
 
-@register
+@register(name='astypes')
 def _extract_astypes(func_node: astroid.FunctionDef) -> Type:
     result = Type.new('')
     for node in walk(func_node):
@@ -77,7 +84,7 @@ def _extract_astypes(func_node: astroid.FunctionDef) -> Type:
     return result
 
 
-@register
+@register(name='inherit')
 def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
     for node in func_node.node_ancestors():
         if isinstance(node, astroid.ClassDef):
@@ -118,7 +125,7 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
     return Type.new('')
 
 
-@register
+@register(name='yield')
 def _extract_yield(func_node: astroid.FunctionDef) -> Type:
     for node in walk(func_node):
         if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
@@ -126,7 +133,7 @@ def _extract_yield(func_node: astroid.FunctionDef) -> Type:
     return Type.new('')
 
 
-@register
+@register(name='none')
 def _extract_no_return(func_node: astroid.FunctionDef) -> Type:
     for node in walk(func_node):
         if isinstance(node, astroid.Return) and node.value is not None:
@@ -134,7 +141,7 @@ def _extract_no_return(func_node: astroid.FunctionDef) -> Type:
     return Type.new('None')
 
 
-@register
+@register(name='name')
 def _extract_from_name(func_node: astroid.FunctionDef) -> Type:
     """Try to guess the return type based on the function name.
     """

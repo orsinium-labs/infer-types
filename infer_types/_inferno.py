@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
 from typing import Iterator
@@ -24,6 +24,7 @@ class Inferno:
     methods: bool = True
     functions: bool = True
     assumptions: bool = True
+    only: frozenset[str] = field(default_factory=frozenset)
 
     def transform(self, path: Path) -> str:
         source = path.read_text()
@@ -70,7 +71,7 @@ class Inferno:
     def _infer_sig(self, node: astroid.FunctionDef) -> FSig | None:
         if node.returns is not None:
             return None
-        return_type = get_return_type(node)
+        return_type = get_return_type(node, names=self.only)
         if return_type is None:
             return None
         if not self.assumptions and return_type.assumptions:
