@@ -275,3 +275,35 @@ def test_import_types(transform, g_imp, g_expr, e_imp, e_type):
             return {g_expr}
     """
     assert transform(given) == dedent(expected)
+
+
+@pytest.mark.parametrize('f_name, e_type', [
+    ('is_user', 'bool'),
+    ('has_access', 'bool'),
+    ('exists', 'bool'),
+    ('contains', 'bool'),
+    ('size', 'int'),
+    ('get_size', 'int'),
+    ('as_dict', 'dict'),
+    ('to_dict', 'dict'),
+    ('dumps', 'str'),
+    ('should_fail', 'bool'),
+    ('can_fail', 'bool'),
+    ('will_fail', 'bool'),
+    ('supports_pickups', 'bool'),
+    ('created_at', 'datetime'),
+    ('updated_at', 'datetime'),
+])
+def test_infer_type_from_function_name(transform, f_name, e_type):
+    given = f"""
+        def {f_name}(x):
+            return x
+    """
+    expected = dedent(f"""
+        def {f_name}(x) -> {e_type}:
+            return x
+    """)
+    actual = transform(given)
+    if e_type == 'datetime':
+        expected = expected.replace('def', 'from datetime import datetime\ndef')
+    assert actual == expected

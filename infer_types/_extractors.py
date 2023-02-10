@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import ast
+import builtins
 from collections import deque
+from types import MappingProxyType
 from typing import Callable, Iterator
 
 import astroid
@@ -12,6 +14,17 @@ from astypes._helpers import conv_node_to_type
 
 Extractor = Callable[[astroid.FunctionDef], Type]
 extractors: list[Extractor] = []
+
+
+KNOWN_NAMES = MappingProxyType({
+    'dumps': 'str',
+    'exists': 'bool',
+    'contains': 'bool',
+    'count': 'int',
+    'size': 'int',
+})
+REMOVE_PREFIXES = ('as_', 'to_', 'get_')
+BOOL_PREFIXES = ('is_', 'has_', 'should_', 'can_', 'will_', 'supports_')
 
 
 def register(extractor: Extractor) -> Extractor:
@@ -119,3 +132,22 @@ def _extract_no_return(func_node: astroid.FunctionDef) -> Type:
         if isinstance(node, astroid.Return) and node.value is not None:
             return Type.new('')
     return Type.new('None')
+
+
+@register
+def _extract_from_name(func_node: astroid.FunctionDef) -> Type:
+    """Try to guess the return type based on the function name.
+    """
+    name: str = func_node.name
+    name = name.lstrip('_')
+    # TODO(@orsinium): use str.removeprefix when migrating to 3.9
+    for prefix in REMOVE_PREFIXES:
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+    if name.startswith(BOOL_PREFIXES):
+        return Type.new('bool')
+    if name.endswith('_at'):
+        return Type.new('datetime', module='datetime')
+    if hasattr(builtins, name):
+        return Type.new(name)
+    return Type.new(KNOWN_NAMES.get(name, ''))

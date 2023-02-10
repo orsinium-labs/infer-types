@@ -27,7 +27,7 @@ keywords = [
 ]
 dependencies = [
     "astroid",
-    "astypes>=0.2.1",
+    "astypes>=0.2.3",
     "typeshed_client",
 ]
 
@@ -43,6 +43,7 @@ lint = [
     "types-protobuf",
     "unify",
 ]
+
 [project.urls]
 Source = "https://github.com/orsinium-labs/infer-types"
 
