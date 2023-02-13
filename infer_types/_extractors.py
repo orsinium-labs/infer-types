@@ -15,6 +15,7 @@ from astypes._helpers import conv_node_to_type
 Extractor = Callable[[astroid.FunctionDef], Type]
 extractors: list[tuple[str, Extractor]] = []
 
+UNKNOWN_TYPE = Type.new('')
 
 KNOWN_NAMES = MappingProxyType({
     'dumps': 'str',
@@ -66,7 +67,7 @@ def walk(func_node: astroid.FunctionDef) -> Iterator[astroid.NodeNG]:
 
 @register(name='astypes')
 def _extract_astypes(func_node: astroid.FunctionDef) -> Type:
-    result = Type.new('')
+    result = UNKNOWN_TYPE
     for node in walk(func_node):
         if not isinstance(node, astroid.Return):
             continue
@@ -80,7 +81,7 @@ def _extract_astypes(func_node: astroid.FunctionDef) -> Type:
         else:
             result = result.merge(node_type)
     if result.unknown:
-        return Type.new('')
+        return UNKNOWN_TYPE
     return result
 
 
@@ -91,7 +92,7 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
             cls_node = node
             break
     else:
-        return Type.new('')
+        return UNKNOWN_TYPE
     for parent in cls_node.getattr(func_node.name):
         if isinstance(parent, astroid.BoundMethod):
             parent = parent._proxied
@@ -122,7 +123,7 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
         return_type = conv_node_to_type(mod_name, type_node)
         if return_type is not None:
             return return_type
-    return Type.new('')
+    return UNKNOWN_TYPE
 
 
 @register(name='yield')
@@ -130,14 +131,22 @@ def _extract_yield(func_node: astroid.FunctionDef) -> Type:
     for node in walk(func_node):
         if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
             return Type.new('Iterator', module='typing')
-    return Type.new('')
+    return UNKNOWN_TYPE
 
 
 @register(name='none')
 def _extract_no_return(func_node: astroid.FunctionDef) -> Type:
+    if not func_node.body:
+        return UNKNOWN_TYPE
+    if len(func_node.body) == 1:
+        node = func_node.body[0]
+        if isinstance(node, (astroid.Raise, astroid.Pass, astroid.Ellipsis)):
+            return UNKNOWN_TYPE
     for node in walk(func_node):
+        if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
+            return UNKNOWN_TYPE
         if isinstance(node, astroid.Return) and node.value is not None:
-            return Type.new('')
+            return UNKNOWN_TYPE
     return Type.new('None')
 
 
