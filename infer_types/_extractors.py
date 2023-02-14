@@ -136,12 +136,20 @@ def _extract_yield(func_node: astroid.FunctionDef) -> Type:
 
 @register(name='none')
 def _extract_no_return(func_node: astroid.FunctionDef) -> Type:
-    if not func_node.body:
-        return UNKNOWN_TYPE
-    if len(func_node.body) == 1:
-        node = func_node.body[0]
-        if isinstance(node, (astroid.Raise, astroid.Pass, astroid.Ellipsis)):
+    # ignore empty methods, they can be there for base class signatures
+    if isinstance(func_node.parent, astroid.ClassDef):
+        if not func_node.body:
             return UNKNOWN_TYPE
+        if len(func_node.body) == 1:
+            node = func_node.body[0]
+
+            if isinstance(node, (astroid.Raise, astroid.Pass)):
+                return UNKNOWN_TYPE
+            if isinstance(node, astroid.Expr):
+                node = node.value
+                if isinstance(node, astroid.Const) and node.value == ...:
+                    return UNKNOWN_TYPE
+
     for node in walk(func_node):
         if isinstance(node, (astroid.Yield, astroid.YieldFrom)):
             return UNKNOWN_TYPE
