@@ -17,6 +17,9 @@ except ImportError:
     import pdb  # type: ignore[no-redef]
 
 
+TEST_NAMES = frozenset({'tests.py', 'conftest.py'})
+
+
 @dataclass(frozen=True)
 class Config:
     format: bool            # run code formatters
@@ -49,8 +52,13 @@ def add_annotations(root: Path, config: Config) -> None:
             continue
         if path.suffix != '.py':
             continue
-        if config.skip_tests and path.name.startswith('test_'):
-            continue
+        if config.skip_tests:
+            if path.name.startswith('test_'):
+                continue
+            if path.name in TEST_NAMES:
+                continue
+            if 'tests' in path.parts:
+                continue
         new_source = inferno.transform(path)
         if config.format:
             new_source = format_code(new_source)

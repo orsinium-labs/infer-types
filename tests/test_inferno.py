@@ -215,6 +215,64 @@ def transform(tmp_path: Path) -> Callable:
         def m(self, x) -> Iterator:
             yield 12
     """,
+    # don't infer no return for empty base class methods
+    """
+    class A:
+        def m(self, x):
+            raise NotImplementedError
+    ---
+    class A:
+        def m(self, x):
+            raise NotImplementedError
+    """,
+    """
+    class A:
+        def m(self, x):
+            "some docstring"
+    ---
+    class A:
+        def m(self, x):
+            "some docstring"
+    """,
+    """
+    class A:
+        def m(self, x):
+            pass
+    ---
+    class A:
+        def m(self, x):
+            pass
+    """,
+    """
+    class A:
+        def m(self, x):
+            ...
+    ---
+    class A:
+        def m(self, x):
+            ...
+    """,
+    # infer no return for methods
+    """
+    class A:
+        def m(self, x):
+            pass
+            1 + 2
+    ---
+    class A:
+        def m(self, x) -> None:
+            pass
+            1 + 2
+    """,
+    """
+    class A:
+        def m(self, x):
+            13
+    ---
+    class A:
+        def m(self, x) -> None:
+            13
+    """,
 ])
 def test_inferno(transform, fused: str) -> None:
     given, expected = fused.split('---')
