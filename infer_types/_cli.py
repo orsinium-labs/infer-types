@@ -32,6 +32,7 @@ class Config:
     assumptions: bool       # allow astypes to make assumptions
     dry: bool               # do not write changes in files
     only: frozenset[str]    # run only the these extractors
+    allowed_types: frozenset[str]  # add annotations with only these types
     stream: TextIO          # stdout
 
 
@@ -43,8 +44,9 @@ def add_annotations(root: Path, config: Config) -> None:
         functions=config.functions,
         assumptions=config.assumptions,
         only=config.only,
+        allowed_types=config.allowed_types,
     )
-    for path in root.iterdir():
+    for path in sorted(root.iterdir()):
         if path.is_dir():
             if config.skip_migrations and path.name == 'migrations':
                 continue
@@ -76,6 +78,10 @@ def main(argv: list[str], stream: TextIO) -> int:
     parser.add_argument(
         '--only', nargs='*', choices=sorted(name for name, _ in extractors),
         help='list of extractors to run (all by default)',
+    )
+    parser.add_argument(
+        '--allowed-types', nargs='*',
+        help='allow only adding annotations with these types',
     )
     parser.add_argument(
         '--format', action='store_true',
@@ -127,6 +133,7 @@ def main(argv: list[str], stream: TextIO) -> int:
         imports=not args.no_imports,
         methods=not args.no_methods,
         only=args.only,
+        allowed_types=args.allowed_types,
         skip_migrations=args.skip_migrations,
         skip_tests=args.skip_tests,
         stream=stream,

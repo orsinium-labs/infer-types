@@ -25,6 +25,7 @@ class Inferno:
     functions: bool = True
     assumptions: bool = True
     only: frozenset[str] = field(default_factory=frozenset)
+    allowed_types: frozenset[str] = field(default_factory=frozenset)
 
     def transform(self, path: Path) -> str:
         source = path.read_text()
@@ -75,6 +76,8 @@ class Inferno:
         if return_type is None:
             return None
         if not self.assumptions and return_type.assumptions:
+            return None
+        if self.allowed_types and return_type.name not in self.allowed_types:
             return None
         return FSig(
             name=node.name,
