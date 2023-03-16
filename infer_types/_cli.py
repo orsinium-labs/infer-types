@@ -26,12 +26,7 @@ class Config:
     skip_tests: bool        # skip `test_*` files
     skip_migrations: bool   # skip `migrations/`
     exit_on_failure: bool   # propagate exceptions
-    imports: bool           # allow annotations requiring imports
-    methods: bool           # allow annotating methods
-    functions: bool         # allow annotating functions
-    assumptions: bool       # allow astypes to make assumptions
     dry: bool               # do not write changes in files
-    only: frozenset[str]    # run only the these extractors
     stream: TextIO          # stdout
 
 
@@ -115,25 +110,20 @@ def main(argv: list[str], stream: TextIO) -> int:
     )
     args = parser.parse_args(argv)
     config = Config(
-        assumptions=not args.no_assumptions,
         dry=args.dry,
         exit_on_failure=args.exit_on_failure or args.pdb,
         format=args.format,
-        functions=not args.no_functions,
-        imports=not args.no_imports,
-        methods=not args.no_methods,
-        only=args.only,
         skip_migrations=args.skip_migrations,
         skip_tests=args.skip_tests,
         stream=stream,
     )
     inferno = Inferno(
         safe=not config.exit_on_failure,
-        imports=config.imports,
-        methods=config.methods,
-        functions=config.functions,
-        assumptions=config.assumptions,
-        only=config.only,
+        imports=not args.no_imports,
+        methods=not args.no_methods,
+        functions=not args.no_functions,
+        assumptions=not args.no_assumptions,
+        only=args.only,
     )
     try:
         add_annotations(args.dir, config, inferno)
