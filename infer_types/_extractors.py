@@ -69,6 +69,8 @@ def walk(func_node: astroid.FunctionDef) -> Iterator[astroid.NodeNG]:
 def _extract_astypes(func_node: astroid.FunctionDef) -> Type:
     result = UNKNOWN_TYPE
     for node in walk(func_node):
+        if isinstance(node, astroid.Yield):
+            return UNKNOWN_TYPE
         if not isinstance(node, astroid.Return):
             continue
         # bare return

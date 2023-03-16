@@ -303,6 +303,19 @@ def transform(tmp_path: Path) -> Callable:
         else:
             return 14
     """,
+    # returns with yield should be ignored
+    """
+    def f(x):
+        if x:
+            return
+        yield x
+    ---
+    from typing import Iterator
+    def f(x) -> Iterator:
+        if x:
+            return
+        yield x
+    """,
 ])
 def test_inferno(transform, fused: str) -> None:
     given, expected = fused.split('---')
