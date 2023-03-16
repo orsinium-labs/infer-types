@@ -273,6 +273,36 @@ def transform(tmp_path: Path) -> Callable:
         def m(self, x) -> None:
             13
     """,
+    # support for implicit return
+    """
+    def f():
+        13
+    ---
+    def f() -> None:
+        13
+    """,
+    """
+    def f(x):
+        if x:
+            return 13
+    ---
+    def f(x) -> int | None:
+        if x:
+            return 13
+    """,
+    """
+    def f(x):
+        if x:
+            return 13
+        else:
+            return 14
+    ---
+    def f(x) -> int:
+        if x:
+            return 13
+        else:
+            return 14
+    """,
 ])
 def test_inferno(transform, fused: str) -> None:
     given, expected = fused.split('---')
