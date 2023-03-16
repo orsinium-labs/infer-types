@@ -303,3 +303,29 @@ def test_only(tmp_path: Path):
     code = main([str(tmp_path), '--only', 'name'], stream)
     assert code == 0
     assert source_file.read_text() == dedent(expected)
+
+
+def test_allowed_types(tmp_path: Path):
+    given = """
+        def f1():
+            return 1
+
+        def is_used(x):
+            return x
+    """
+    expected = """
+        def f1():
+            return 1
+
+        def is_used(x) -> bool:
+            return x
+    """
+
+    # prepare files and dirs
+    source_file = tmp_path / 'example.py'
+    source_file.write_text(dedent(given))
+    # call the CLI
+    stream = StringIO()
+    code = main([str(tmp_path), '--allowed-types', 'bool'], stream)
+    assert code == 0
+    assert source_file.read_text() == dedent(expected)

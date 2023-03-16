@@ -69,6 +69,10 @@ def main(argv: list[str], stream: TextIO) -> int:
         help='list of extractors to run (all by default)',
     )
     parser.add_argument(
+        '--allowed-types', nargs='*',
+        help='allow only adding annotations with these types',
+    )
+    parser.add_argument(
         '--format', action='store_true',
         help='run available code formatters on the modified files',
     )
@@ -123,6 +127,7 @@ def main(argv: list[str], stream: TextIO) -> int:
         methods=not args.no_methods,
         functions=not args.no_functions,
         assumptions=not args.no_assumptions,
+        allowed_types=args.allowed_types,
         only=args.only,
     )
     try:
