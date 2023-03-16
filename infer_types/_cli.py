@@ -35,36 +35,32 @@ class Config:
     stream: TextIO          # stdout
 
 
-def add_annotations(root: Path, config: Config) -> None:
-    inferno = Inferno(
-        safe=not config.exit_on_failure,
-        imports=config.imports,
-        methods=config.methods,
-        functions=config.functions,
-        assumptions=config.assumptions,
-        only=config.only,
-    )
+def add_annotations(root: Path, config: Config, inferno: Inferno) -> None:
+    if root.is_file():
+        _annotate_file(root, config, inferno)
+        return
+    if config.skip_migrations and root.name == 'migrations':
+        return
     for path in root.iterdir():
-        if path.is_dir():
-            if config.skip_migrations and path.name == 'migrations':
-                continue
-            add_annotations(path, config)
-            continue
-        if path.suffix != '.py':
-            continue
-        if config.skip_tests:
-            if path.name.startswith('test_'):
-                continue
-            if path.name in TEST_NAMES:
-                continue
-            if 'tests' in path.parts:
-                continue
-        new_source = inferno.transform(path)
-        if config.format:
-            new_source = format_code(new_source)
-        if not config.dry:
-            path.write_text(new_source)
-        print(path, file=config.stream)
+        add_annotations(path, config, inferno)
+
+
+def _annotate_file(path: Path, config: Config, inferno: Inferno) -> None:
+    if path.suffix != '.py':
+        return
+    if config.skip_tests:
+        if path.name.startswith('test_'):
+            return
+        if path.name in TEST_NAMES:
+            return
+        if 'tests' in path.parts:
+            return
+    new_source = inferno.transform(path)
+    if config.format:
+        new_source = format_code(new_source)
+    if not config.dry:
+        path.write_text(new_source)
+    print(path, file=config.stream)
 
 
 def main(argv: list[str], stream: TextIO) -> int:
@@ -131,10 +127,20 @@ def main(argv: list[str], stream: TextIO) -> int:
         skip_tests=args.skip_tests,
         stream=stream,
     )
+    inferno = Inferno(
+        safe=not config.exit_on_failure,
+        imports=config.imports,
+        methods=config.methods,
+        functions=config.functions,
+        assumptions=config.assumptions,
+        only=config.only,
+    )
     try:
-        add_annotations(args.dir, config)
+        add_annotations(args.dir, config, inferno)
     except Exception:  # pragma: no cover
-        pdb.post_mortem()
+        if args.pdb:
+            pdb.post_mortem()
+        raise
     return 0
 
 
