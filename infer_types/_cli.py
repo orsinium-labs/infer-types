@@ -26,45 +26,36 @@ class Config:
     skip_tests: bool        # skip `test_*` files
     skip_migrations: bool   # skip `migrations/`
     exit_on_failure: bool   # propagate exceptions
-    imports: bool           # allow annotations requiring imports
-    methods: bool           # allow annotating methods
-    functions: bool         # allow annotating functions
-    assumptions: bool       # allow astypes to make assumptions
     dry: bool               # do not write changes in files
-    only: frozenset[str]    # run only the these extractors
     stream: TextIO          # stdout
 
 
-def add_annotations(root: Path, config: Config) -> None:
-    inferno = Inferno(
-        safe=not config.exit_on_failure,
-        imports=config.imports,
-        methods=config.methods,
-        functions=config.functions,
-        assumptions=config.assumptions,
-        only=config.only,
-    )
+def add_annotations(root: Path, config: Config, inferno: Inferno) -> None:
+    if root.is_file():
+        _annotate_file(root, config, inferno)
+        return
+    if config.skip_migrations and root.name == 'migrations':
+        return
     for path in root.iterdir():
-        if path.is_dir():
-            if config.skip_migrations and path.name == 'migrations':
-                continue
-            add_annotations(path, config)
-            continue
-        if path.suffix != '.py':
-            continue
-        if config.skip_tests:
-            if path.name.startswith('test_'):
-                continue
-            if path.name in TEST_NAMES:
-                continue
-            if 'tests' in path.parts:
-                continue
-        new_source = inferno.transform(path)
-        if config.format:
-            new_source = format_code(new_source)
-        if not config.dry:
-            path.write_text(new_source)
-        print(path, file=config.stream)
+        add_annotations(path, config, inferno)
+
+
+def _annotate_file(path: Path, config: Config, inferno: Inferno) -> None:
+    if path.suffix != '.py':
+        return
+    if config.skip_tests:
+        if path.name.startswith('test_'):
+            return
+        if path.name in TEST_NAMES:
+            return
+        if 'tests' in path.parts:
+            return
+    new_source = inferno.transform(path)
+    if config.format:
+        new_source = format_code(new_source)
+    if not config.dry:
+        path.write_text(new_source)
+    print(path, file=config.stream)
 
 
 def main(argv: list[str], stream: TextIO) -> int:
@@ -76,6 +67,10 @@ def main(argv: list[str], stream: TextIO) -> int:
     parser.add_argument(
         '--only', nargs='*', choices=sorted(name for name, _ in extractors),
         help='list of extractors to run (all by default)',
+    )
+    parser.add_argument(
+        '--allowed-types', nargs='*',
+        help='allow only adding annotations with these types',
     )
     parser.add_argument(
         '--format', action='store_true',
@@ -119,22 +114,28 @@ def main(argv: list[str], stream: TextIO) -> int:
     )
     args = parser.parse_args(argv)
     config = Config(
-        assumptions=not args.no_assumptions,
         dry=args.dry,
         exit_on_failure=args.exit_on_failure or args.pdb,
         format=args.format,
-        functions=not args.no_functions,
-        imports=not args.no_imports,
-        methods=not args.no_methods,
-        only=args.only,
         skip_migrations=args.skip_migrations,
         skip_tests=args.skip_tests,
         stream=stream,
     )
+    inferno = Inferno(
+        safe=not config.exit_on_failure,
+        imports=not args.no_imports,
+        methods=not args.no_methods,
+        functions=not args.no_functions,
+        assumptions=not args.no_assumptions,
+        allowed_types=args.allowed_types,
+        only=args.only,
+    )
     try:
-        add_annotations(args.dir, config)
+        add_annotations(args.dir, config, inferno)
     except Exception:  # pragma: no cover
-        pdb.post_mortem()
+        if args.pdb:
+            pdb.post_mortem()
+        raise
     return 0
 
 

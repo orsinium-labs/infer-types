@@ -273,6 +273,49 @@ def transform(tmp_path: Path) -> Callable:
         def m(self, x) -> None:
             13
     """,
+    # support for implicit return
+    """
+    def f():
+        13
+    ---
+    def f() -> None:
+        13
+    """,
+    """
+    def f(x):
+        if x:
+            return 13
+    ---
+    def f(x) -> int | None:
+        if x:
+            return 13
+    """,
+    """
+    def f(x):
+        if x:
+            return 13
+        else:
+            return 14
+    ---
+    def f(x) -> int:
+        if x:
+            return 13
+        else:
+            return 14
+    """,
+    # returns with yield should be ignored
+    """
+    def f(x):
+        if x:
+            return
+        yield x
+    ---
+    from typing import Iterator
+    def f(x) -> Iterator:
+        if x:
+            return
+        yield x
+    """,
 ])
 def test_inferno(transform, fused: str) -> None:
     given, expected = fused.split('---')

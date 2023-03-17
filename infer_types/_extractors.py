@@ -69,6 +69,8 @@ def walk(func_node: astroid.FunctionDef) -> Iterator[astroid.NodeNG]:
 def _extract_astypes(func_node: astroid.FunctionDef) -> Type:
     result = UNKNOWN_TYPE
     for node in walk(func_node):
+        if isinstance(node, astroid.Yield):
+            return UNKNOWN_TYPE
         if not isinstance(node, astroid.Return):
             continue
         # bare return
@@ -82,7 +84,18 @@ def _extract_astypes(func_node: astroid.FunctionDef) -> Type:
             result = result.merge(node_type)
     if result.unknown:
         return UNKNOWN_TYPE
+    if _has_implicit_return(func_node):
+        return result.merge(Type.new('None'))
     return result
+
+
+def _has_implicit_return(func_node: astroid.FunctionDef) -> bool:
+    if not func_node.body:
+        return False
+    node = func_node.body[-1]
+    if not isinstance(node, (astroid.If, astroid.For)):
+        return False
+    return not node.orelse
 
 
 @register(name='inherit')
