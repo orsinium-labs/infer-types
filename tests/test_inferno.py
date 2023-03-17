@@ -316,6 +316,33 @@ def transform(tmp_path: Path) -> Callable:
             return
         yield x
     """,
+    # magic methods inference
+    """
+    class C:
+        def __int__(self):
+            ...
+    ---
+    class C:
+        def __int__(self) -> int:
+            ...
+    """,
+    """
+    class C:
+        def __iter__(self):
+            ...
+    ---
+    from typing import Iterator
+    class C:
+        def __iter__(self) -> Iterator:
+            ...
+    """,
+    """
+    def __int__(self):
+        return x
+    ---
+    def __int__(self):
+        return x
+    """,
 ])
 def test_inferno(transform, fused: str) -> None:
     given, expected = fused.split('---')

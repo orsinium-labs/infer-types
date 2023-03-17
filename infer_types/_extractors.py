@@ -3,7 +3,6 @@ from __future__ import annotations
 import ast
 import builtins
 from collections import deque
-from types import MappingProxyType
 from typing import Callable, Iterator
 
 import astroid
@@ -11,21 +10,15 @@ import typeshed_client
 from astypes import Ass, Type, get_type
 from astypes._helpers import conv_node_to_type
 
+from ._constants import (
+    BOOL_PREFIXES, KNOWN_NAMES, MAGIC_METHODS, REMOVE_PREFIXES,
+)
+
 
 Extractor = Callable[[astroid.FunctionDef], Type]
 extractors: list[tuple[str, Extractor]] = []
 
 UNKNOWN_TYPE = Type.new('')
-
-KNOWN_NAMES = MappingProxyType({
-    'dumps': 'str',
-    'exists': 'bool',
-    'contains': 'bool',
-    'count': 'int',
-    'size': 'int',
-})
-REMOVE_PREFIXES = ('as_', 'to_', 'get_')
-BOOL_PREFIXES = ('is_', 'has_', 'should_', 'can_', 'will_', 'supports_')
 
 
 def register(name: str) -> Callable[[Extractor], Extractor]:
@@ -125,7 +118,8 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
         if module is None:
             continue
         child_nodes = module[cls_name].child_nodes
-        assert child_nodes is not None
+        if child_nodes is None:
+            continue
         try:
             method_def = child_nodes[func_name]
         except KeyError:
@@ -137,6 +131,13 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
         if return_type is not None:
             return return_type
     return UNKNOWN_TYPE
+
+
+@register(name='magic')
+def _extract_magic_method(func_node: astroid.FunctionDef) -> Type:
+    if not func_node.is_method():
+        return UNKNOWN_TYPE
+    return MAGIC_METHODS.get(func_node.name, UNKNOWN_TYPE)
 
 
 @register(name='yield')
