@@ -135,6 +135,8 @@ def _extract_inherit_method(func_node: astroid.FunctionDef) -> Type:
 
 @register(name='magic')
 def _extract_magic_method(func_node: astroid.FunctionDef) -> Type:
+    if not func_node.is_method():
+        return UNKNOWN_TYPE
     return MAGIC_METHODS.get(func_node.name, UNKNOWN_TYPE)
 
 
